@@ -5,3 +5,5 @@ This is a ROS package used to put detected objects thanks to Convolutional Neura
 Here's the ROS architecture :
 
 ![alt text](https://github.com/hakamir/process_3D_position/blob/master/ROS_diagram_full_2.png)
+
+# Work is progress
