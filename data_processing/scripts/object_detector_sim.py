@@ -22,7 +22,7 @@ def obj_sim(x_factor, y_factor, z_factor):
     msg = ObjectMsg()
     x = 0
     y = 0
-    z = 1
+    z = 2
     way = 0
     while not rospy.is_shutdown():
         
@@ -44,10 +44,10 @@ def obj_sim(x_factor, y_factor, z_factor):
         msg.position.z = z
         msg.obj_class = 'person'
         msg.score = 0.80
+        msg.ID = 0
         pub.publish(msg)
         rate.sleep()
         
-
 if __name__ == '__main__':
     try:
         obj_sim(0.0,0.0,0.0)

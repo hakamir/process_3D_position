@@ -58,6 +58,7 @@ class areaMaker:
         in /object/position/3D topic the whole position of every detected
         objects. It performs like a light SLAM. 
         """
+        print("\n__________________________________\n")
         start = time.time()
         
         # Get the point position, class and score
@@ -67,6 +68,7 @@ class areaMaker:
         point = np.matrix([[x],[y],[z]])
         _class = objectMsg.obj_class
         score = objectMsg.score
+        ID = objectMsg.ID
         
         # Get the camera position (euler vector) and rotation (quaternion)
         cam_x = cameraPosMsg.linear.x
@@ -81,7 +83,6 @@ class areaMaker:
 #        cam_rot = np.matrix([[cam_rx], [cam_ry], [cam_rz], [cam_rw]])
         
         quaternion = Quaternion(cam_rw, cam_rx, cam_ry, cam_rz)
-        print(quaternion)
         
         # Set an arbitrary scale of the mesh
         # MUST BE DEPENDANT OF THE CLASS OF THE OBJECT IN THE FURE
@@ -100,7 +101,7 @@ class areaMaker:
         
         # If no object exist, we create a new mesh at the given position of the added point
         if len(self.obj_list) == 0:
-            self.obj_list.append(object_creator(point, cam_point, scale, quaternion, _class, score))
+            self.obj_list.append(object_creator(point, cam_point, scale, quaternion, _class, score, ID))
         
         # Run through each existence area to check if the added point is inside and do processing
         for item in self.obj_list:
@@ -125,6 +126,7 @@ class areaMaker:
                 # We correct the duplication problem by removing an overcrafting of mesh
                 if redondance > 1:
                     self.obj_list.remove(item)
+                    break
                     
                 # Say that no object must be created
                 lock_obj_creator = True
@@ -138,7 +140,7 @@ class areaMaker:
             try:
                 dt = time.time() - item.get_last_detection_time()
                 print("Last detection: \n{}".format(round(dt,6)))
-                if dt > 5:
+                if dt > 10:
                     self.obj_list.remove(item)
             
             # Avoid synchronization error (rare normally)
@@ -146,33 +148,36 @@ class areaMaker:
                 print("ERROR: Cannot get last detection time.")
             
             # get all data Publish the position of the object
-            center = item.get_center()
-            rotation = item.get_quaternion()
-            _class = item.get_class()
-            score = item.get_score()
-            creation_time = item.get_creation_time()
-            last_detection_time = item.get_last_detection_time()
+            msg_center = item.get_center()
+            msg_rotation = item.get_quaternion()
+            msg_class = item.get_class()
+            msg_score = item.get_score()
+            msg_ID = item.get_ID()
+            msg_creation_time = item.get_creation_time()
+            msg_last_detection_time = item.get_last_detection_time()
             now = rospy.get_rostime()
             self.msg.header.stamp.secs = now.secs
             self.msg.header.stamp.nsecs = now.nsecs
-            self.msg.center.x = center[0]
-            self.msg.center.y = center[1]
-            self.msg.center.z = center[2]
-            self.msg.rotation.x = rotation[0]
-            self.msg.rotation.y = rotation[1]
-            self.msg.rotation.z = rotation[2]
-            self.msg.creation_time = creation_time
-            self.msg.last_detection_time = last_detection_time
-            self.msg.obj_class = _class
-            self.msg.score = score
+            self.msg.center.x = msg_center[0]
+            self.msg.center.y = msg_center[1]
+            self.msg.center.z = msg_center[2]
+            self.msg.rotation.x = msg_rotation[0]
+            self.msg.rotation.y = msg_rotation[1]
+            self.msg.rotation.z = msg_rotation[2]
+            self.msg.creation_time = msg_creation_time
+            self.msg.last_detection_time = msg_last_detection_time
+            self.msg.obj_class = msg_class
+            self.msg.score = msg_score
+            self.msg.ID = msg_ID
             self.pub.publish(self.msg)
 
         # Print the number of detected objects in the environment        
         print("Detected objects: {}".format(len(self.obj_list)))
         
         # Create a new object (a limit is added for the test)
-        if not lock_obj_creator and len(self.obj_list) < 1:
-            self.obj_list.append(object_creator(point, cam_point, scale, quaternion, _class, score))
+#        if not lock_obj_creator and len(self.obj_list) < 1:
+        if not lock_obj_creator:
+            self.obj_list.append(object_creator(point, cam_point, scale, quaternion, _class, score, ID))
         print("Processing time: {} ms".format(round((time.time()-start)*1000,3)))
         
 if __name__ == '__main__':

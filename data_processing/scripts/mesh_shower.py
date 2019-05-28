@@ -10,27 +10,42 @@ import numpy as np
 import matplotlib.pyplot as plt
 import rospy
 from data_processing.msg import PointMsg
+import time as t
 
 class mesh_shower_2D:
     def __init__(self):
         rospy.init_node('mesh_shower_node')
-        sub = rospy.Subscriber('/object/position/3D', PointMsg, self.process)
+        sub = rospy.Subscriber('/object/position/3D', PointMsg, self.process, queue_size=10)
+        self.i = 0
         rospy.spin()
-        
+     
     def process(self, msg):
         
+        start = t.time()
         stamp = msg.header.stamp
         time = stamp.secs + stamp.nsecs * 1e-9
         x = msg.center.x
         y = msg.center.y
         z = msg.center.z
+        _class = msg.obj_class
         plt.subplot(211)
         plt.plot(z, x, 'o')
+        plt.xlabel('z')
+        plt.ylabel('x')
+        plt.text(z, x, _class, fontsize=12)
         plt.subplot(212)
         plt.plot(y, x, 'o')
-        plt.axis("equal")
-        plt.draw()
-        plt.pause(0.00000000001)
+        plt.xlabel('y')
+        plt.ylabel('x')
+        plt.text(y, x, _class, fontsize=12)
+
+        self.i += 1
+        if self.i%10 == 0:
+            plt.pause(0.001)
+        if self.i == 11:
+            plt.clf()
+            self.i = 0
+        print("Processing: {}".format(t.time()-start))
         
 if __name__ == '__main__':
     try:

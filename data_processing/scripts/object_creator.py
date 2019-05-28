@@ -20,7 +20,7 @@ It corresponds to the existence area used in the areaMaker.py scripts.
 """
 
 class object_creator():
-    def __init__(self, point_pos, cam_pos, scale, quaternion, _class, score):
+    def __init__(self, point_pos, cam_pos, scale, quaternion, _class, score, ID):
         
         self.point_pos = point_pos
         self.cam_pos = cam_pos
@@ -28,6 +28,7 @@ class object_creator():
         self.quaternion = quaternion
         self._class = _class
         self.score = score
+        self.ID = ID
         self.iteration = 1
         self.creation_time = time.time()
         self.last_detection = self.creation_time
@@ -118,6 +119,9 @@ class object_creator():
     
     def get_score(self):
         return self.score
+        
+    def get_ID(self):
+        return self.ID
     
     def get_vertice_coordinate(self, vertice):
         return self.vertices[vertice]
