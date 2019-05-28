@@ -20,7 +20,9 @@ add_message_files(
   FILES
   PointMsg.msg
   ObjectMsg.msg
+  PostObjectMsg.msg
   CameraMsg.msg
+  BboxMsg.msg
 )
 ## Generate services in the 'srv' folder
 # add_service_files(
