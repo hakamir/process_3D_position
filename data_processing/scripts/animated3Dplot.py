@@ -11,11 +11,11 @@ import math
 import rospy
 from data_processing.msg import PointMsg
 from data_processing.msg import CameraMsg
-#from pyquaternion import Quaternion 
+#from pyquaternion import Quaternion
 
 """
 The MyGLView class is created to add specific functions to the GLViewWidget
-from OpenGL, especially to print text on the viewer. 
+from OpenGL, especially to print text on the viewer.
 """
 class MyGLView(gl.GLViewWidget):
     def __init__(self, x=None, y=None, z=None, text=None):
@@ -24,10 +24,10 @@ class MyGLView(gl.GLViewWidget):
         self.x = x
         self.y = y
         self.z = z
-        
+
     def showSelectedItem(self, x, y, box):
         """
-        This method give the position of an selected item in the viewer. 
+        This method give the position of a selected item in the viewer.
         """
         pos = [x, y, 20, 20]
         item_list = self.itemsAt(pos)
@@ -44,7 +44,7 @@ class MyGLView(gl.GLViewWidget):
     def setText(self, x, y, z, text):
         """
         The method set the position (x,y,z) and the content of the a text that might
-        be used with the renderText inner function. 
+        be used with the renderText inner function.
         """
         self.text = text
         self.x = x
@@ -64,7 +64,7 @@ detected objects. It also create a mesh that can be shown on the viewer.
 """
 class Box:
     def __init__(self, x, y, z, _class, score, ID):
-        
+
         self.x = x
         self.y = y
         self.z = z
@@ -76,7 +76,7 @@ class Box:
         self.ID = ID
         self.drawn = False
         self.draw_box()
-        
+
     def draw_box(self):
         """
         The method create a mesh of box type that is used to represent objects.
@@ -92,10 +92,10 @@ class Box:
         self.box.translate(self.x - self.scale[0]/2, self.y - self.scale[1]/2, self.z - self.scale[2]/2)
         self.drawn = True
         return self.box
-        
+
     def get_color_class(self, _class, score):
         """
-        This method aimed to set specific colors to objects from a csv file. 
+        This method aimed to set specific colors to objects from a csv file.
         If the object isn't define within, set white.
         """
         with open('../data/color.csv') as f:
@@ -110,15 +110,15 @@ class Box:
             return 255,255,255,score*255
 
 """
-Main class showing objects in a 3D environment with OpenGL. 
+Main class showing objects in a 3D environment with OpenGL.
 """
 class Visualizer(object):
     def __init__(self):
-        
+
         self.app = QtGui.QApplication(sys.argv)
         self.mouse = QtGui.QCursor()
         self.pxl = QtGui.QLabel('test')
-        
+
         # Create custom GLViewWidget
         self.w = MyGLView()
         self.w.opts['distance'] = 40
@@ -128,12 +128,12 @@ class Visualizer(object):
         self.height = 720
         self.w.setGeometry(0, 0, self.width, self.height)
         self.w.show()
-        
+
         # Create an axis in the world coordinate center
         axis = gl.GLAxisItem()
         axis.setSize(2,2,2)
         self.w.addItem(axis)
-        
+
         # Create an axis representing the camera
         self.cam = gl.GLAxisItem()
         self.cam.setSize(1,1,1)
@@ -144,40 +144,39 @@ class Visualizer(object):
         self.rotX_old = 0
         self.rotY_old = 0
         self.rotZ_old = 0
-        
+
         # create the background grids
         gz = gl.GLGridItem()
         gz.setSize(1000,1000)
         self.w.addItem(gz)
-        
+
         # Initialize class variables
         self.lock = True
-        self.boxes = []        
+        self.boxes = []
 
         # init ROS tools
         rospy.init_node('mesh_3D_node')
         rospy.Subscriber('/object/position/3D', PointMsg, self.process, queue_size=10)
         rospy.Subscriber('/camera/position', CameraMsg, self.update_cam_position, queue_size=10)
-        
 
     def process(self, msg):
         """
         Add a box with received data from ROS topic
         """
         x, y, z = msg.center.x, msg.center.y, msg.center.z
-        
+
         _class = msg.obj_class
         score = msg.score
         ID = msg.ID
         self.box = Box(z, x, y, _class, score, ID)
         self.lock = False
         self.box.box.translate(z, x, y)
-        
         return
-        
+
     def quaternion_to_euler(self, x, y, z, w):
         """
-        Convert quaternion to euler angles function
+        Convert quaternion to euler angles in degrees. The method return the
+        Euler vector in the form: "yaw, pitch, roll". These values are float.
         """
         t0 = +2.0 * (w * x + y * z)
         t1 = +1.0 - 2.0 * (x * x + y * y)
@@ -190,29 +189,29 @@ class Visualizer(object):
         t4 = +1.0 - 2.0 * (y * y + z * z)
         yaw = math.degrees(math.atan2(t3, t4))
         return yaw, pitch, roll
-        
+
     def update_cam_position(self, cameraPosMsg):
         """
-        Move the camera on the GLViewWidget to the known position received
+        Move the Intel T265 camera on the GLViewWidget to the known position received.
         """
         # Get the camera position (euler vector) and rotation (quaternion)
         self.cam_x = cameraPosMsg.linear.z
         self.cam_y = cameraPosMsg.linear.x
         self.cam_z = cameraPosMsg.linear.y
         #cam_point = np.matrix([[self.cam_x], [self.cam_y], [self.cam_z]])
-        
+
         self.cam_rx = cameraPosMsg.angular.x
         self.cam_ry = cameraPosMsg.angular.y
         self.cam_rz = cameraPosMsg.angular.z
         self.cam_rw = cameraPosMsg.angular.w
         #quaternion = Quaternion(self.cam_rw, self.cam_rx, self.cam_ry, self.cam_rz)
-        
+
         # Translate to known position of the camera
         self.cam.translate(self.cam_x - self.cam_x_old, self.cam_y - self.cam_y_old, self.cam_z - self.cam_z_old)
         self.cam_x_old = self.cam_x
         self.cam_y_old = self.cam_y
         self.cam_z_old = self.cam_z
-        
+
         # Rotate the camera from the given quaternion --> Doesn't work. It needs to be change entirely
         """
         rotX, rotY, rotZ = self.quaternion_to_euler(self.cam_rx, self.cam_ry, self.cam_rz, self.cam_rw)
@@ -224,11 +223,10 @@ class Visualizer(object):
         self.rotZ_old = rotZ
         """
 
-        
     def update(self):
         """
         This method update the scene from the ROS messages received and is able
-        to move the various objects and show information about it with the cursor. 
+        to move the various objects and show information about it with the cursor.
         """
         IDs = []
 
@@ -266,20 +264,19 @@ class Visualizer(object):
         except AttributeError: # If no object has been created
             return False
 
-
     def animation(self):
-        # Animate the scene each t milliseconds passing through the update method. 
+        # Animate the scene each t milliseconds passing through the update method.
         t = 50
         timer = QtCore.QTimer()
         timer.timeout.connect(self.update)
         timer.start(t)
         self.start()
-        
+
     def start(self):
         # Execute the instance
         if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
             QtGui.QApplication.instance().exec_()
-            
+
 
 # Start Qt event loop unless running in interactive mode.
 if __name__ == '__main__':
