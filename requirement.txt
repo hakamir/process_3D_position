@@ -1,0 +1,8 @@
+torch
+tensorflow-gpu
+pyrealsense2
+numpy
+cv2
+pyqtgraph
+pyopengl
+pyquaternion
