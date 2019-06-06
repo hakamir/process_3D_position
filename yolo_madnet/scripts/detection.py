@@ -4,6 +4,7 @@ from __future__ import print_function
 # -*- coding: utf-8 -*-
 
 import rospy
+import message_filters
 from sensor_msgs.msg import Image
 from yolo_madnet.msg import BboxMsg
 from cv_bridge import CvBridge, CvBridgeError
@@ -32,8 +33,11 @@ class detection:
         self.bridge = CvBridge()
         rospy.init_node('detection_node')
         #sub_l = rospy.Subscriber('/usb_cam/image_raw', Image, self.process, queue_size=10)
-        sub_l = rospy.Subscriber('/camera/color/image_raw', Image, self.process, queue_size=10)
-        self.pub = rospy.Publisher('/detection', BboxMsg, queue_size=10)
+        sub_l = message_filters.Subscriber('/camera/infra2/image_rect_raw', Image)
+        ats = message_filters.ApproximateTimeSynchronizer([sub_l], queue_size=1, slop=0.001)
+        ats.registerCallback(self.process)
+        self.pub = rospy.Publisher('/detection', BboxMsg, queue_size=0)
+        self.pub_img = rospy.Publisher('/detection/image', Image, queue_size=0)
         self.msg_pub = BboxMsg()
         rospy.spin()
 
@@ -115,11 +119,9 @@ class detection:
                 self.msg_pub.obj_class = label
                 self.msg_pub.score = score
                 self.pub.publish(self.msg_pub)
-                #print('Detect {} with {} score at {}, {} position'.format(label, round(score,2), (x1, y1), (x2, y2)))
                 plot_one_box(pos, orig_img, label=label, color=self.colors[int(det[item][6])])
         print('FPS: {}'.format(int(1 / (time.time() - start))))
-        cv2.imshow('Detection', orig_img)
-        cv2.waitKey(1)
+        self.pub_img.publish(self.bridge.cv2_to_imgmsg(orig_img, "rgb8"))
 
 
     def letterbox(self, image, new_shape=416, color=(127.5, 127.5, 127.5), mode='auto'):
