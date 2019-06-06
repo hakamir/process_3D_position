@@ -109,9 +109,9 @@ class detection:
                 for i in range(len(pos)):
                     pos[i] = int(pos[i])
                 x1, y1, x2, y2 = pos
-                now = rospy.get_rostime()
-                self.msg_pub.header.stamp.secs = now.secs
-                self.msg_pub.header.stamp.nsecs = now.nsecs
+                #now = rospy.get_rostime()
+                #self.msg_pub.header.stamp.secs = now.secs
+                #self.msg_pub.header.stamp.nsecs = now.nsecs
                 self.msg_pub.x1 = x1
                 self.msg_pub.y1 = y1
                 self.msg_pub.x2 = x2

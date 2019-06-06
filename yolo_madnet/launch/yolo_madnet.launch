@@ -1,0 +1,4 @@
+<launch>
+  <node pkg="yolo_madnet" name="detection" type="scripts/detection.py" output="screen"> 
+  </node>
+</launch>
