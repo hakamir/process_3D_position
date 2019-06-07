@@ -1,7 +1,7 @@
-from __future__ import print_function
-
 #! /usr/bin/python
 # -*- coding: utf-8 -*-
+
+from __future__ import print_function
 
 import rospy
 import message_filters
@@ -10,7 +10,7 @@ from yolo_madnet.msg import BboxMsg
 from cv_bridge import CvBridge, CvBridgeError
 
 import time
-import sys, os
+
 try:
     import cv2
 except ImportError:
@@ -20,6 +20,7 @@ except ImportError:
 
 from yolov3.models import *
 from yolov3.utils.utils import *
+
 
 
 
@@ -109,9 +110,6 @@ class detection:
                 for i in range(len(pos)):
                     pos[i] = int(pos[i])
                 x1, y1, x2, y2 = pos
-                #now = rospy.get_rostime()
-                #self.msg_pub.header.stamp.secs = now.secs
-                #self.msg_pub.header.stamp.nsecs = now.nsecs
                 self.msg_pub.x1 = x1
                 self.msg_pub.y1 = y1
                 self.msg_pub.x2 = x2

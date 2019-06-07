@@ -1,12 +1,27 @@
+## *Work in progress*
+
+
 # Process 3D position
 
 This is a ROS package used to put detected objects thanks to Convolutional Neural Network (Yolov3 in our case) and distance estimator using disparity (Real-time Self-adaptative Deep Stereo of MADNet in our project) into a 3D space. 
 
 Here's the ROS architecture :
 
-![alt text](https://github.com/hakamir/process_3D_position/blob/master/ROS_diagram_full_2.png)
+![alt text](https://github.com/hakamir/process_3D_position/blob/master/ROS_diagram_2.png)
 
 We use different project from GitHub that are listed below:
+
+## Usage:
+
+For now, no usable roslaunch have been created. Run every scripts by hand in different terminal to proceed. 
+
+## Downloads:
+
+The following link contains the RTSADS and yolov3 repositories of this projet. Just copy them at the right place to get the functions needed for algorithms.
+
+https://drive.google.com/open?id=1iT88gagBGAoxw0BVj_g25YovM_3-SftN
+
+## Ressources:
 
 ### For the object detection: 
 https://github.com/ultralytics/yolov3
@@ -37,5 +52,3 @@ https://github.com/abewley/sort
   doi={10.1109/ICIP.2016.7533003}
 }
 
-
-## *Work in progress*

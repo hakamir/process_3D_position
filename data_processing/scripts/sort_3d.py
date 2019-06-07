@@ -29,7 +29,13 @@ from sklearn.utils.linear_assignment_ import linear_assignment
 import time
 import argparse
 from filterpy.kalman import KalmanFilter
-import cv2
+try:
+    import cv2
+except ImportError:
+    import sys
+    sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+    import cv2
+    sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
 from math import tan, pi
 #import random
 
@@ -109,7 +115,7 @@ def convert_bbox_to_z(bbox,distance):
 
 """
 def convert_bbox_to_z_rod(bbox, distance):
-    
+
 #    z = (self.focal*self.baseline)/(self.pixel_size*distance) # convert disparity to meters
     fx = (width/2)/tan(HFOV/2 * pi/180)		# Focal in pixel (x)
     fy = (height/2)/tan(VFOV/2 * pi/180)	# Focal in pixel (y)
@@ -119,13 +125,13 @@ def convert_bbox_to_z_rod(bbox, distance):
     h = bbox[3]-bbox[1]
     u = bbox[0]+w/2.
     v = bbox[1]+h/2.
-    
+
     s=w*h
     r = w/float(h)
     z = distance
     x = (u - width/2) * z / fx
     y = (v - height/2) * z / fy
-    
+
     return np.array([x,y,z,s,r]).reshape((5,1))
 """
 
@@ -311,7 +317,7 @@ class Sort(object):
 
     #create and initialise new trackers for unmatched detections
     for i in unmatched_dets:
-        trk = KalmanBoxTracker(dets[i,:],distances[i]) 
+        trk = KalmanBoxTracker(dets[i,:],distances[i])
         self.trackers.append(trk)
     i = len(self.trackers)
     for trk in reversed(self.trackers):
@@ -337,7 +343,7 @@ class Sort(object):
     if(len(pred)>0):
         return [],np.concatenate(pred),[],np.concatenate(pred_space)
     return np.empty((0,5)),np.empty((0,5)),np.empty((0,5)),np.empty((0,5))
-    
+
 def parse_args():
     """Parse input arguments."""
     parser = argparse.ArgumentParser(description='SORT demo')
@@ -355,11 +361,11 @@ if __name__ == '__main__':
   colours = np.random.rand(1000,3) #used only for display
   colours*=255
 
-  
+
   if not os.path.exists('output'):
     os.makedirs('output')
-  
-  
+
+
   mot_tracker = Sort() #create instance of the SORT tracker
   with open('output/out.txt','w') as out_file:
       for frame in range(len(file_list)):
@@ -385,28 +391,20 @@ if __name__ == '__main__':
           label=" distance= %.2fm"%distance
 #          label=str(d[4])
           plot_one_box([x1, y1, x2, y2], original_img, label=label, color=colours[int(d[4])-1])
-          
+
           print('%d,%d,%.2f,%.2f,%.2f,%.2f,1,-1,-1,-1'%(frame,d[4],d[0],d[1],d[2]-d[0],d[3]-d[1]),file=out_file)
-          
-          
+
+
         for d in predictions:
           x1,y1,x2,y2=int(d[0]),int(d[1]),int(d[2]),int(d[3])
           distance=np.sqrt(predictions_space[0]**2 + predictions_space[1]**2 + predictions_space[2]**2)
           label="Prediction distance= %.2fm"%distance
 #          label=str(d[4])+' prediction'
           plot_one_box([x1, y1, x2, y2], original_img, label=label, color=colours[int(d[4])-1])
-          
+
           print('%d,%d,%.2f,%.2f,%.2f,%.2f,1,-1,-1,-1'%(frame,d[4],d[0],d[1],d[2]-d[0],d[3]-d[1]),file=out_file)
         cv2.imwrite('output/img/out%06i.png'%frame,original_img)
 
 
 
   print("Total Tracking took: %.3f for %d frames or %.1f FPS"%(total_time,total_frames,total_frames/total_time))
-
-  
-
-
-
-
-
-
