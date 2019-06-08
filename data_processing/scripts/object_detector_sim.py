@@ -44,7 +44,6 @@ def obj_sim(x_factor, y_factor, z_factor):
         msg.position.z = z
         msg.obj_class = 'person'
         msg.score = 0.80
-        msg.ID = 0
         pub.publish(msg)
         rate.sleep()
         

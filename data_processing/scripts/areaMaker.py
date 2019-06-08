@@ -52,6 +52,21 @@ class areaMaker:
         point = cam_point + point.T
         return point
     
+    def add_ID(self, IDs):
+	k = 0
+	IDs = sorted(IDs)
+	add = False
+	for i in IDs:
+	    if k not in IDs:
+		IDs.append(k)
+		add = True
+		break
+	    k += 1
+	if not add:
+	    IDs.append(k)
+	IDs = sorted(IDs)
+	return IDs, k
+
     def process(self, objectMsg, cameraPosMsg):
         """
         Main function of the class. Perform the job of the script and publish
@@ -68,7 +83,6 @@ class areaMaker:
         point = np.matrix([[x],[y],[z]])
         _class = objectMsg.obj_class
         score = objectMsg.score
-        ID = objectMsg.ID
         
         # Get the camera position (euler vector) and rotation (quaternion)
         cam_x = cameraPosMsg.linear.x
@@ -90,6 +104,8 @@ class areaMaker:
         
         redondance = 0
         
+	IDs = []
+	
         # Print the point position in the camera and global referentials
         print(Fore.BLUE + "\nPoint position: ")
         print("#-----------REFENTIALS-----------#" + Style.RESET_ALL)
@@ -101,6 +117,7 @@ class areaMaker:
         
         # If no object exist, we create a new mesh at the given position of the added point
         if len(self.obj_list) == 0:
+	    IDs, ID = self.add_ID(IDs)
             self.obj_list.append(object_creator(point, cam_point, scale, quaternion, _class, score, ID))
         
         # Run through each existence area to check if the added point is inside and do processing
@@ -177,6 +194,7 @@ class areaMaker:
         # Create a new object (a limit is added for the test)
 #        if not lock_obj_creator and len(self.obj_list) < 1:
         if not lock_obj_creator:
+	    IDs, ID = self.add_ID(IDs)
             self.obj_list.append(object_creator(point, cam_point, scale, quaternion, _class, score, ID))
         print("Processing time: {} ms".format(round((time.time()-start)*1000,3)))
         
