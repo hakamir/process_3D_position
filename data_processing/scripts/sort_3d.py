@@ -69,6 +69,8 @@ def iou(bb_test,bb_gt):
     + (bb_gt[2]-bb_gt[0])*(bb_gt[3]-bb_gt[1]) - wh)
   return(o)
 
+"""
+
 file_dir_path="/home/amphani/catkin_ws/src/data_processing/data/moving/npy/"
 img_dir_path="/home/amphani/catkin_ws/src/data_processing/data/moving/images/"
 
@@ -81,6 +83,8 @@ file_list=sorted(file_list,key=get_file_number)
 
 img_list=[img_dir_path + file_name for file_name in os.listdir(img_dir_path)]
 img_list=sorted(img_list,key=get_file_number)
+
+"""
 
 def plot_one_box(x, img, color=None, label=None, line_thickness=None):
     # Plots one bounding box on image img
@@ -351,6 +355,8 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+"""
+
 if __name__ == '__main__':
   # all trai
   args = parse_args()
@@ -408,3 +414,5 @@ if __name__ == '__main__':
 
 
   print("Total Tracking took: %.3f for %d frames or %.1f FPS"%(total_time,total_frames,total_frames/total_time))
+
+"""
