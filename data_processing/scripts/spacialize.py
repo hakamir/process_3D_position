@@ -1,4 +1,5 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
+
 from __future__ import print_function
 import rospy
 from data_processing.msg import ObjectMsg
@@ -33,8 +34,11 @@ class spacialize:
 
 
     def process(self, msg):
-
-
+        """
+        This is a advanced approach to convert (u,v) pixel position to meters.
+        It used the SORT program modified to handle 3D data and performs
+        prediction from the Kalman filter.
+        """
         dets = np.array([[msg.x1, msg.y1, msg.x2, msg.y2]])
         disparity = [msg.disparity]
         _class = msg.obj_class
@@ -58,8 +62,10 @@ class spacialize:
 
 
 
-
     def process_old(self, msg):
+        """
+        This is a basic approach to convert (u,v) pixel position to meters.
+        """
         u = msg.position.x
         v = msg.position.y
         disparity = msg.position.z
@@ -73,7 +79,8 @@ class spacialize:
 
         if disparity != 0:
 
-            z = (self.focal*self.baseline)/(self.pixel_size*disparity) # convert disparity to meters
+            #z = (self.focal*self.baseline)/(self.pixel_size*disparity) # convert disparity to meters
+            z = disparity
             x = (u - self.width/2) * z / fx
             y = (v - self.height/2) * z / fy
 
@@ -96,4 +103,4 @@ if __name__ == '__main__':
     try:
         spacialize()
     except rospy.ROSInterruptException:
-        rospy.logerr('Could not start node.')
+        rospy.logerr('Could not start spacialize node.')

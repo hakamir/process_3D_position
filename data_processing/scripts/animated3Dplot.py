@@ -1,4 +1,4 @@
-#!/usr/bin/python 3
+#!/usr/bin/python3
 
 from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph.opengl as gl
