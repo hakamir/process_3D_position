@@ -18,7 +18,7 @@ class spacialize:
 
         rospy.init_node('spacialize_node')
         sub = rospy.Subscriber('/object/post', PostObjectMsg, self.process_old, queue_size=1)
-        self.pub = rospy.Publisher('/object', ObjectMsg, queue_size = 10)
+        self.pub = rospy.Publisher('/object/detected', ObjectMsg, queue_size = 10)
         self.obj = ObjectMsg()
 
         # Parameters of the Intel D435

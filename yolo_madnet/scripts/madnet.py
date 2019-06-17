@@ -68,8 +68,8 @@ class madnet:
 
         self.bridge = CvBridge()
         rospy.init_node('madnet_node')
-        sub_l = message_filters.Subscriber('/camera/infra1/image_rect_raw', Image)
-        sub_r = message_filters.Subscriber('/camera/infra2/image_rect_raw', Image)
+        sub_l = message_filters.Subscriber('/d435/infra1/image_rect_raw', Image)
+        sub_r = message_filters.Subscriber('/d435/infra2/image_rect_raw', Image)
         ats = message_filters.ApproximateTimeSynchronizer([sub_l, sub_r], queue_size=1, slop=0.01)
         ats.registerCallback(self.process)
         self.pub = rospy.Publisher('/disparity', Image, queue_size=1)
@@ -336,6 +336,7 @@ class madnet:
                 dispy=fetches[-1]
                 dispy_to_save = np.clip(dispy[0].astype(np.uint16), 0, MAX_DISP)
                 out_img=dispy_to_save*255
+                print(out_img)
                 self.pub.publish(self.bridge.cv2_to_imgmsg(out_img, "16UC1"))
             self.step+=1
             print('FPS: {}'.format(int(1 / (time.time() - start))))

@@ -21,7 +21,7 @@ class post_process:
         self.bridge = CvBridge()
         rospy.init_node('post_process_node')
         disparity = message_filters.Subscriber('/disparity', Image)
-        object = message_filters.Subscriber('/detection', BboxMsg)
+        object = message_filters.Subscriber('/detection/bbox', BboxMsg)
         color = message_filters.Subscriber('/detection/image', Image)
         ats = message_filters.ApproximateTimeSynchronizer([disparity, object, color], queue_size=3, slop=0.1)
         ats.registerCallback(self.process)

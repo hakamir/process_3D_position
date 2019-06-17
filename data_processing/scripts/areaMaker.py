@@ -4,7 +4,7 @@ import rospy
 import message_filters
 from data_processing.msg import ObjectMsg
 from data_processing.msg import PointMsg
-from data_processing.msg import CameraMsg
+from nav_msgs.msg import Odometry
 
 from object_creator import object_creator
 import numpy as np
@@ -36,8 +36,8 @@ class areaMaker:
         print('Initializing node...')
         rospy.init_node('areamaker_node')
         self.IDs = []
-        subObj = message_filters.Subscriber('/object', ObjectMsg)
-        subcampos = message_filters.Subscriber('/camera/position', CameraMsg)
+        subObj = message_filters.Subscriber('/object/detected', ObjectMsg)
+        subcampos = message_filters.Subscriber('/t265/odom/sample', Odometry)
 
         ats = message_filters.ApproximateTimeSynchronizer([subObj, subcampos], queue_size=10, slop=0.1)
         ats.registerCallback(self.process)
@@ -87,15 +87,15 @@ class areaMaker:
         score = objectMsg.score
 
         # Get the camera position (euler vector) and rotation (quaternion)
-        cam_x = cameraPosMsg.linear.x
-        cam_y = cameraPosMsg.linear.y
-        cam_z = cameraPosMsg.linear.z
+        cam_x = cameraPosMsg.pose.pose.position.x
+        cam_y = cameraPosMsg.pose.pose.position.y
+        cam_z = cameraPosMsg.pose.pose.position.z
         cam_point = np.matrix([[cam_x], [cam_y], [cam_z]])
 
-        cam_rx = cameraPosMsg.angular.x
-        cam_ry = cameraPosMsg.angular.y
-        cam_rz = cameraPosMsg.angular.z
-        cam_rw = cameraPosMsg.angular.w
+        cam_rx = cameraPosMsg.pose.pose.orientation.x
+        cam_ry = cameraPosMsg.pose.pose.orientation.y
+        cam_rz = cameraPosMsg.pose.pose.orientation.z
+        cam_rw = cameraPosMsg.pose.pose.orientation.w
 #        cam_rot = np.matrix([[cam_rx], [cam_ry], [cam_rz], [cam_rw]])
 
         quaternion = Quaternion(cam_rw, cam_rx, cam_ry, cam_rz)
@@ -158,6 +158,7 @@ class areaMaker:
             try:
                 dt = time.time() - item.get_last_detection_time()
                 print("Last detection: \n{}".format(round(dt,6)))
+                # If an object haven't been detected since a specific time, remove it. 
                 if dt > 10:
                     self.obj_list.remove(item)
 

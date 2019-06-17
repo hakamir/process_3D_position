@@ -10,7 +10,7 @@ import math
 
 import rospy
 from data_processing.msg import PointMsg
-from data_processing.msg import CameraMsg
+from nav_msgs.msg import Odometry
 #from pyquaternion import Quaternion
 
 """
@@ -157,7 +157,7 @@ class Visualizer(object):
         # init ROS tools
         rospy.init_node('mesh_3D_node')
         rospy.Subscriber('/object/position/3D', PointMsg, self.process, queue_size=10)
-        rospy.Subscriber('/camera/position', CameraMsg, self.update_cam_position, queue_size=10)
+        rospy.Subscriber('/t265/odom/sample', Odometry, self.update_cam_position, queue_size=10)
 
     def process(self, msg):
         """
@@ -190,20 +190,20 @@ class Visualizer(object):
         yaw = math.degrees(math.atan2(t3, t4))
         return yaw, pitch, roll
 
-    def update_cam_position(self, cameraPosMsg):
+    def update_cam_position(self, msg):
         """
         Move the Intel T265 camera on the GLViewWidget to the known position received.
         """
         # Get the camera position (euler vector) and rotation (quaternion)
-        self.cam_x = cameraPosMsg.linear.z
-        self.cam_y = cameraPosMsg.linear.x
-        self.cam_z = cameraPosMsg.linear.y
+        self.cam_x = msg.pose.pose.position.z
+        self.cam_y = msg.pose.pose.position.x
+        self.cam_z = msg.pose.pose.position.y
         #cam_point = np.matrix([[self.cam_x], [self.cam_y], [self.cam_z]])
 
-        self.cam_rx = cameraPosMsg.angular.x
-        self.cam_ry = cameraPosMsg.angular.y
-        self.cam_rz = cameraPosMsg.angular.z
-        self.cam_rw = cameraPosMsg.angular.w
+        self.cam_rx = msg.pose.pose.orientation.x
+        self.cam_ry = msg.pose.pose.orientation.y
+        self.cam_rz = msg.pose.pose.orientation.z
+        self.cam_rw = msg.pose.pose.orientation.w
         #quaternion = Quaternion(self.cam_rw, self.cam_rx, self.cam_ry, self.cam_rz)
 
         # Translate to known position of the camera
@@ -229,15 +229,18 @@ class Visualizer(object):
         to move the various objects and show information about it with the cursor.
         """
         IDs = []
-
+        # We want here to show some information about the selected object
         for box in self.boxes:
             IDs.append(box.ID)
             cursor_x = self.mouse.pos().x() - self.w.pos().x()
             cursor_y = self.mouse.pos().y() - self.w.pos().y()
-            # If the cursor is one a box, then show info, else, show nothing
+            # If the cursor is on a box, then show info, else, show nothing
             try:
                 posX, posY, posZ = self.w.showSelectedItem(cursor_x,cursor_y, box)
-                if box.x - 1 <= posX <= box.x + 1 and box.y - 1 <= posY <= box.y + 1 and box.z - 1 <= posZ <= box.z + 1:
+                inX = box.x - box.scale[0] <= posX <= box.x + box.scale[0]
+                inY = box.y - box.scale[1] <= posY <= box.y + box.scale[1]
+                inZ = box.z - box.scale[2] <= posZ <= box.z + box.scale[2]
+                if inX and inY and inZ:
                     info = (box._class + ' ' + str(round(box.score,2)))
                     self.w.setText(posX, posY, posZ,info)
             except:
