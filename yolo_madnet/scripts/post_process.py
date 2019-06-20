@@ -31,17 +31,17 @@ class post_process:
     implemented. The spacialize node will be merged with this one.
     """
     def __init__(self):
-        print('Initialize node...')
         # D435 parameters
         self.baseline = 49.867050e-3
         self.focal = 1.93e-3
         self.pixel_size = 3e-6
 
+        # Loading class names file and generate random colors for bounding boxes
         self.classes = self.load_classes('yolov3/data/coco.names')
         self.colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(self.classes))]
         self.bridge = CvBridge()
 
-        # Init ROS node and topics
+        # Init ROS node, publishers and subscribers
         rospy.init_node('post_process_node')
         disparity = message_filters.Subscriber('/disparity', Image)
         object = message_filters.Subscriber('/detection/image', DetectionMsg)
@@ -75,14 +75,15 @@ class post_process:
             distance = self.disp_mask(mask[0][0], disparity, bbox)
 
             # We define the position of the object on the image at the center of the box
-            u = (x2 - x1) / 2
-            v = (y2 - y1) / 2
+            u = (x2 - x1) / 2 + x1 - img.shape[1]/2
+            v = (y2 - y1) / 2 + y1 - img.shape[0]/2
 
             # We found (x,y,z) positions through those equations
             factor = np.sqrt(1/(self.focal**2 + self.pixel_size**2 * u**2 + self.pixel_size**2 * v**2))
             X = distance * self.pixel_size * u * factor
             Y = distance * self.pixel_size * v * factor
             Z = distance * self.focal * factor
+            print(object.obj_class,X,Y,Z)
 
             # Now provide data to the message and publish it to the topic
             _class = object.obj_class
