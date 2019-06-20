@@ -21,7 +21,8 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   BboxMsg.msg
-  DispMsg.msg
+  DetectionMsg.msg
+  DisparityMsg.msg
 )
 ## Generate services in the 'srv' folder
 # add_service_files(

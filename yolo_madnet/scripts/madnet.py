@@ -21,7 +21,7 @@ from RTSADS.Sampler import sampler_factory
 import rospy
 import message_filters
 from sensor_msgs.msg import Image
-from yolo_madnet.msg import DispMsg
+from yolo_madnet.msg import DisparityMsg
 from cv_bridge import CvBridge, CvBridgeError
 
 import time
@@ -56,7 +56,7 @@ class madnet:
         parser.add_argument("--fixedID",help="index of the portions of network to train, used only if sampleMode=FIXED",type=int,nargs='+',default=[0])
         parser.add_argument("--reprojectionScale",help="compute all loss function at 1/reprojectionScale",default=1,type=int)
         parser.add_argument("--summary",help='flag to enable tensorboard summaries',action='store_true')
-        parser.add_argument("--imageShape", help='two int for image shape [height,width]', nargs='+', type=int, default=[360,640])
+        parser.add_argument("--imageShape", help='two int for image shape [height,width]', nargs='+', type=int, default=[480,848])
         parser.add_argument("--SSIMTh",help="reset network to initial configuration if loss is above this value",type=float,default=0.5)
         parser.add_argument("--sampleFrequency",help="sample new network portions to train every K frame",type=int,default=1)
         parser.add_argument("--mode",help="online adaptation mode: NONE - perform only inference, FULL - full online backprop, MAD - backprop only on portions of the network", choices=['NONE','FULL','MAD'], default='MAD')
@@ -73,7 +73,7 @@ class madnet:
         ats = message_filters.ApproximateTimeSynchronizer([sub_l, sub_r], queue_size=1, slop=0.01)
         ats.registerCallback(self.process)
         self.pub = rospy.Publisher('/disparity', Image, queue_size=1)
-        self.msg_pub = Image()
+        self.msg_pub = DisparityMsg()
         rospy.spin()
 
     def scale_tensor(self,tensor,scale):
@@ -334,10 +334,9 @@ class madnet:
             #save disparity if requested
             if self.args.logDispStep!=-1 and self.step%self.args.logDispStep==0:
                 dispy=fetches[-1]
-                dispy_to_save = np.clip(dispy[0].astype(np.uint16), 0, MAX_DISP)
+                dispy_to_save = np.clip(dispy[0].astype(np.float32), 0, MAX_DISP)
                 out_img=dispy_to_save*255
-                print(out_img)
-                self.pub.publish(self.bridge.cv2_to_imgmsg(out_img, "16UC1"))
+                self.pub.publish(self.bridge.cv2_to_imgmsg(out_img, "32FC1"))
             self.step+=1
             print('FPS: {}'.format(int(1 / (time.time() - start))))
         except tf.errors.OutOfRangeError:

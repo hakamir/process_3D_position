@@ -39,7 +39,7 @@ class areaMaker:
         subObj = message_filters.Subscriber('/object/detected', ObjectMsg)
         subcampos = message_filters.Subscriber('/t265/odom/sample', Odometry)
 
-        ats = message_filters.ApproximateTimeSynchronizer([subObj, subcampos], queue_size=10, slop=0.1)
+        ats = message_filters.ApproximateTimeSynchronizer([subObj, subcampos], queue_size=1, slop=0.1)
         ats.registerCallback(self.process)
         self.obj_list = []
         self.pub = rospy.Publisher('/object/position/3D', PointMsg, queue_size=10)
@@ -53,21 +53,6 @@ class areaMaker:
         point = np.matrix([point[0],point[1],point[2]])
         point = cam_point + point.T
         return point
-
-    def add_ID(self, IDs):
-        k = 0
-        IDs = sorted(IDs)
-        add = False
-        for i in IDs:
-            if k not in IDs:
-            	IDs.append(k)
-            	add = True
-            	break
-            k += 1
-        if not add:
-            IDs.append(k)
-        IDs = sorted(IDs)
-        return IDs, k
 
     def process(self, objectMsg, cameraPosMsg):
         """
@@ -101,7 +86,7 @@ class areaMaker:
         quaternion = Quaternion(cam_rw, cam_rx, cam_ry, cam_rz)
 
         # Set an arbitrary scale of the mesh
-        # MUST BE DEPENDANT OF THE CLASS OF THE OBJECT IN THE FURE
+        # MUST BE DEPENDANT OF THE CLASS OF THE OBJECT IN THE FUTURE
         scale = (1,1,1)
 
         redondance = 0
@@ -110,14 +95,12 @@ class areaMaker:
         print(Fore.BLUE + "\nPoint position: ")
         print("#-----------REFENTIALS-----------#" + Style.RESET_ALL)
         print("Camera referential: \n{}".format(point))
-#        global_point = self.transpose_to_global_euler(point, cam_point, cam_rot)
         global_point = self.transpose_to_global_quaternion(point, cam_point, quaternion)
         print("Global referential: \n{}".format(global_point))
         print(Fore.BLUE + "#-----------ALL OBJECTS-----------#")
 
         # If no object exist, we create a new mesh at the given position of the added point
         if len(self.obj_list) == 0:
-            #self.IDs, ID = self.add_ID(self.IDs)
             self.obj_list.append(object_creator(point, cam_point, scale, quaternion, _class, score, len(self.obj_list)))
 
         # Run through each existence area to check if the added point is inside and do processing
@@ -158,7 +141,7 @@ class areaMaker:
             try:
                 dt = time.time() - item.get_last_detection_time()
                 print("Last detection: \n{}".format(round(dt,6)))
-                # If an object haven't been detected since a specific time, remove it. 
+                # If an object haven't been detected since a specific time, remove it.
                 if dt > 10:
                     self.obj_list.remove(item)
 
@@ -194,9 +177,7 @@ class areaMaker:
         print("Detected objects: {}".format(len(self.obj_list)))
 
         # Create a new object (a limit is added for the test)
-#        if not lock_obj_creator and len(self.obj_list) < 1:
         if not lock_obj_creator:
-            #self.IDs, ID = self.add_ID(self.IDs)
             self.obj_list.append(object_creator(point, cam_point, scale, quaternion, _class, score, len(self.obj_list)))
         print("Processing time: {} ms".format(round((time.time()-start)*1000,3)))
 

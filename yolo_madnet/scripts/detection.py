@@ -7,6 +7,7 @@ import rospy
 import message_filters
 from sensor_msgs.msg import Image
 from yolo_madnet.msg import BboxMsg
+from yolo_madnet.msg import DetectionMsg
 from cv_bridge import CvBridge, CvBridgeError
 
 import time
@@ -34,12 +35,11 @@ class detection:
         self.bridge = CvBridge()
         rospy.init_node('detection_node')
         #sub_l = rospy.Subscriber('/usb_cam/image_raw', Image, self.process, queue_size=10)
-        sub_l = message_filters.Subscriber('/d435/infra2/image_rect_raw', Image)
+        sub_l = message_filters.Subscriber('/d435/infra1/image_rect_raw', Image)
         ats = message_filters.ApproximateTimeSynchronizer([sub_l], queue_size=1, slop=0.001)
         ats.registerCallback(self.process)
-        self.pub = rospy.Publisher('/detection/bbox', BboxMsg, queue_size=0)
-        self.pub_img = rospy.Publisher('/detection/image', Image, queue_size=0)
-        self.msg_pub = BboxMsg()
+        #sub_l = rospy.Subscriber('/d435/infra1/image_rect_raw', Image, self.process, queue_size=10)
+        self.pub = rospy.Publisher('/detection/image', DetectionMsg, queue_size=1)
         rospy.spin()
 
     """
@@ -81,6 +81,7 @@ class detection:
         # Input image from topic
         #os.system('clear')
         start = time.time()
+        msg_detection = DetectionMsg()
         try:
             img = self.bridge.imgmsg_to_cv2(msg, "bgr8")
             orig_img = img
@@ -105,22 +106,23 @@ class detection:
             det[:, :4] = scale_coords(img.shape[2:], det[:, :4], orig_img.shape[:2]).round()
             for item in range(len(det)):
                 label = '%s' % (self.classes[int(det[item][6].unique())])
-                score = det[item][4]
+                score = det[item][4].tolist()
                 pos = det[item][0:4].tolist()
                 for i in range(len(pos)):
                     pos[i] = int(pos[i])
                 x1, y1, x2, y2 = pos
-                self.msg_pub.x1 = x1
-                self.msg_pub.y1 = y1
-                self.msg_pub.x2 = x2
-                self.msg_pub.y2 = y2
-                self.msg_pub.obj_class = label
-                self.msg_pub.score = score
-                self.pub.publish(self.msg_pub)
-                plot_one_box(pos, orig_img, label=label, color=self.colors[int(det[item][6])])
+                msg_bbox = BboxMsg()
+                msg_bbox.x1 = x1
+                msg_bbox.y1 = y1
+                msg_bbox.x2 = x2
+                msg_bbox.y2 = y2
+                msg_bbox.obj_class = label
+                msg_bbox.score = score
+                msg_detection.bbox.append(msg_bbox)
+                #plot_one_box(pos, orig_img, label=label, color=self.colors[int(det[item][6])])
         print('FPS: {}'.format(int(1 / (time.time() - start))))
-        self.pub_img.publish(self.bridge.cv2_to_imgmsg(orig_img, "rgb8"))
-
+        msg_detection.image = self.bridge.cv2_to_imgmsg(orig_img, "rgb8")
+        self.pub.publish(msg_detection)
 
     def letterbox(self, image, new_shape=416, color=(127.5, 127.5, 127.5), mode='auto'):
         # Resize a rectangular image to a 32 pixel multiple rectangle
