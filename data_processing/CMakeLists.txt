@@ -18,10 +18,10 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
-  PointMsg.msg
-  ObjectMsg.msg
-  PostObjectMsg.msg
   CameraMsg.msg
+  PointMsg.msg
+  PointsMsg.msg
+  ObjectMsg.msg
 )
 ## Generate services in the 'srv' folder
 # add_service_files(

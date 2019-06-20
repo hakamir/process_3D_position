@@ -5,7 +5,8 @@ import rospy
 import message_filters
 from sensor_msgs.msg import Image
 from yolo_madnet.msg import DetectionMsg
-from data_processing.msg import ObjectMsg
+from data_processing.msg import PointMsg
+from data_processing.msg import PointsMsg
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
 import random
@@ -47,9 +48,8 @@ class post_process:
         object = message_filters.Subscriber('/detection/image', DetectionMsg)
         ats = message_filters.ApproximateTimeSynchronizer([disparity, object], queue_size=1, slop=0.1)
         ats.registerCallback(self.process)
-        self.pub = rospy.Publisher('/object/detected', ObjectMsg, queue_size=0)
+        self.pub = rospy.Publisher('/object/detected', PointsMsg, queue_size=0)
         self.pub_img = rospy.Publisher('/detection/distance', Image, queue_size=0)
-        self.msg_pub = ObjectMsg()
         rospy.spin()
 
     """
@@ -57,6 +57,7 @@ class post_process:
     It manages all the process to provide the asked output topics.
     """
     def process(self, disp, obj):
+        points_list = PointsMsg()
         # Convert ros image message to opencv images
         try:
             disparity = self.bridge.imgmsg_to_cv2(disp, "32FC1")
@@ -83,20 +84,20 @@ class post_process:
             X = distance * self.pixel_size * u * factor
             Y = distance * self.pixel_size * v * factor
             Z = distance * self.focal * factor
-            print(object.obj_class,X,Y,Z)
 
-            # Now provide data to the message and publish it to the topic
+            # Now append data to the message
             _class = object.obj_class
             score = object.score
             now = rospy.get_rostime()
-            self.msg_pub.header.stamp.secs = now.secs
-            self.msg_pub.header.stamp.nsecs = now.nsecs
-            self.msg_pub.position.x = X
-            self.msg_pub.position.y = Y
-            self.msg_pub.position.z = Z
-            self.msg_pub.obj_class = _class
-            self.msg_pub.score = score
-            self.pub.publish(self.msg_pub)
+            point = PointMsg()
+            point.header.stamp.secs = now.secs
+            point.header.stamp.nsecs = now.nsecs
+            point.position.x = X
+            point.position.y = Y
+            point.position.z = Z
+            point.obj_class = _class
+            point.score = score
+            points_list.point.append(point)
 
             # Plot box to the image for visualisation
             label = _class + " " + str(round(distance,2)) + ' m'
@@ -107,6 +108,11 @@ class post_process:
 
         # Publish the visualisation of bounding box with distance
         self.pub_img.publish(self.bridge.cv2_to_imgmsg(img, "rgb8"))
+        # Publish the message
+        now = rospy.get_rostime()
+        points_list.header.stamp.secs = now.secs
+        points_list.header.stamp.nsecs = now.nsecs
+        self.pub.publish(points_list)
 
     def load_classes(self, path):
         # Loads *.names file at 'path'

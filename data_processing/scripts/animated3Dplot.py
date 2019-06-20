@@ -9,7 +9,7 @@ import csv
 import math
 
 import rospy
-from data_processing.msg import PointMsg
+from data_processing.msg import ObjectMsg
 from nav_msgs.msg import Odometry
 #from pyquaternion import Quaternion
 
@@ -156,7 +156,7 @@ class Visualizer(object):
 
         # init ROS tools
         rospy.init_node('mesh_3D_node')
-        rospy.Subscriber('/object/position/3D', PointMsg, self.process, queue_size=10)
+        rospy.Subscriber('/object/position/3D', ObjectMsg, self.process, queue_size=10)
         rospy.Subscriber('/t265/odom/sample', Odometry, self.update_cam_position, queue_size=10)
 
     def process(self, msg):
