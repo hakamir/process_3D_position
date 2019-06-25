@@ -3,6 +3,7 @@
 import rospy
 import message_filters
 from data_processing.msg import ObjectMsg
+from data_processing.msg import ObjectsMsg
 from data_processing.msg import PointsMsg
 from data_processing.msg import CameraMsg
 from nav_msgs.msg import Odometry
@@ -44,9 +45,8 @@ class areaMaker:
         ats = message_filters.ApproximateTimeSynchronizer([subObj, subcampos], queue_size=1, slop=0.1)
         ats.registerCallback(self.process)
         self.obj_list = []
-        self.pub = rospy.Publisher('/object/position/3D', ObjectMsg, queue_size=10)
+        self.pub = rospy.Publisher('/object/position/3D', ObjectsMsg, queue_size=10)
         self.time =time.time()
-        self.msg = ObjectMsg()
         rospy.spin()
 
     def transpose_to_global_quaternion(self, point, cam_point, quaternion):
@@ -64,6 +64,9 @@ class areaMaker:
         """
         print("\n__________________________________\n")
         start = time.time()
+
+        objects = ObjectsMsg()
+
         for pt in pointsMsg.point:
             # Get the point position, class and score
             x = pt.position.x
@@ -167,22 +170,27 @@ class areaMaker:
                 msg_creation_time = item.get_creation_time()
                 msg_last_detection_time = item.get_last_detection_time()
                 now = rospy.get_rostime()
-                self.msg.header.stamp.secs = now.secs
-                self.msg.header.stamp.nsecs = now.nsecs
-                self.msg.center.x = msg_center[0]
-                self.msg.center.y = msg_center[1]
-                self.msg.center.z = msg_center[2]
-                self.msg.rotation.x = msg_rotation[0]
-                self.msg.rotation.y = msg_rotation[1]
-                self.msg.rotation.z = msg_rotation[2]
-                self.msg.creation_time = msg_creation_time
-                self.msg.last_detection_time = msg_last_detection_time
-                self.msg.obj_class = msg_class
-                self.msg.score = msg_score
-                self.msg.ID = msg_ID
-                self.pub.publish(self.msg)
+                object = ObjectMsg()
+                object.header.stamp.secs = now.secs
+                object.header.stamp.nsecs = now.nsecs
+                object.center.x = msg_center[0]
+                object.center.y = msg_center[1]
+                object.center.z = msg_center[2]
+                object.rotation.x = msg_rotation[0]
+                object.rotation.y = msg_rotation[1]
+                object.rotation.z = msg_rotation[2]
+                object.creation_time = msg_creation_time
+                object.last_detection_time = msg_last_detection_time
+                object.obj_class = msg_class
+                object.score = msg_score
+                object.ID = msg_ID
+                objects.append(object)
 
             # Print the number of detected objects in the environment
+            now = rospy.get_rostime()
+            objects.header.stamp.secs = now.secs
+            objects.header.stamp.nsecs = now.nsecs
+            self.pub.publish(objects)
             print("Detected objects: {}".format(len(self.obj_list)))
 
             # Create a new object (a limit is added for the test)
