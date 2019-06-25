@@ -151,7 +151,10 @@ class post_process:
         disp_seg = np.ma.masked_array(disp_seg, mask=mask)
         median = np.median(disp_seg.data)
         # We now calculate the distance in meter
-        distance=focal_lenght * baseline / (pixel_size*(median + 0.001))
+        if distance==0:
+            distance=focal_lenght * baseline / (pixel_size*(median + 0.001))
+        else:
+            distance=focal_lenght * baseline / (pixel_size*distance)
         return distance
 
     """

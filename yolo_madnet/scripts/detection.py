@@ -35,7 +35,8 @@ class detection:
         self.bridge = CvBridge()
         rospy.init_node('detection_node')
         #sub_l = rospy.Subscriber('/usb_cam/image_raw', Image, self.process, queue_size=10)
-        sub_l = message_filters.Subscriber('/d435/infra1/image_rect_raw', Image)
+        #sub_l = message_filters.Subscriber('/d435/infra1/image_rect_raw', Image)
+        sub_l = message_filters.Subscriber('/usb_cam/image_raw', Image)
         ats = message_filters.ApproximateTimeSynchronizer([sub_l], queue_size=1, slop=0.001)
         ats.registerCallback(self.process)
         #sub_l = rospy.Subscriber('/d435/infra1/image_rect_raw', Image, self.process, queue_size=10)
@@ -54,9 +55,14 @@ class detection:
         self.conf_thres = 0.5
         self.nms_thres = 0.5
         # Path to config and weights files
-        cfg = 'yolov3/cfg/yolov3-spp.cfg'
-        weights = 'yolov3/weights/yolov3-spp.weights'
-        class_names = 'yolov3/data/coco.names'
+        # For yolov3 spp
+        #cfg = 'yolov3/cfg/yolov3-spp.cfg'
+        #weights = 'yolov3/weights/yolov3-spp.weights'
+        #class_names = 'yolov3/data/coco.names'
+        # For ADAPT dataset
+        cfg = 'adapt/yolov3-adapt.cfg'
+        weights = 'adapt/yolov3-adapt_best.weights'
+        class_names = 'adapt/adapt.names'
 
         # Load model and weights
         print('Loading models...')

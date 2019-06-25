@@ -39,7 +39,7 @@ class areaMaker:
         self.IDs = []
         subObj = message_filters.Subscriber('/object/detected', PointsMsg)
         #subcampos = message_filters.Subscriber('/t265/odom/sample', Odometry)
-        subcampos = message_filters.Subscriber('/t265/odom/sample', CameraMsg)
+        subcampos = message_filters.Subscriber('/t265/odom/sample', Odometry)
 
         ats = message_filters.ApproximateTimeSynchronizer([subObj, subcampos], queue_size=1, slop=0.1)
         ats.registerCallback(self.process)
@@ -74,22 +74,22 @@ class areaMaker:
             score = pt.score
 
             # Get the camera position (euler vector) and rotation (quaternion)
-            #cam_x = cameraPosMsg.pose.pose.position.x
-            #cam_y = cameraPosMsg.pose.pose.position.y
-            #cam_z = cameraPosMsg.pose.pose.position.z
-            cam_x = cameraPosMsg.linear.x
-            cam_y = cameraPosMsg.linear.y
-            cam_z = cameraPosMsg.linear.z
+            cam_x = cameraPosMsg.pose.pose.position.x
+            cam_y = cameraPosMsg.pose.pose.position.y
+            cam_z = cameraPosMsg.pose.pose.position.z
+            #cam_x = cameraPosMsg.linear.x
+            #cam_y = cameraPosMsg.linear.y
+            #cam_z = cameraPosMsg.linear.z
             cam_point = np.matrix([[cam_x], [cam_y], [cam_z]])
 
-            #cam_rx = cameraPosMsg.pose.pose.orientation.x
-            #cam_ry = cameraPosMsg.pose.pose.orientation.y
-            #cam_rz = cameraPosMsg.pose.pose.orientation.z
-            #cam_rw = cameraPosMsg.pose.pose.orientation.w
-            cam_rx = cameraPosMsg.angular.x
-            cam_ry = cameraPosMsg.angular.y
-            cam_rz = cameraPosMsg.angular.z
-            cam_rw = cameraPosMsg.angular.w
+            cam_rx = cameraPosMsg.pose.pose.orientation.x
+            cam_ry = cameraPosMsg.pose.pose.orientation.y
+            cam_rz = cameraPosMsg.pose.pose.orientation.z
+            cam_rw = cameraPosMsg.pose.pose.orientation.w
+            #cam_rx = cameraPosMsg.angular.x
+            #cam_ry = cameraPosMsg.angular.y
+            #cam_rz = cameraPosMsg.angular.z
+            #cam_rw = cameraPosMsg.angular.w
     #        cam_rot = np.matrix([[cam_rx], [cam_ry], [cam_rz], [cam_rw]])
 
             quaternion = Quaternion(cam_rw, cam_rx, cam_ry, cam_rz)
