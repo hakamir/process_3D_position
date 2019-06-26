@@ -7,7 +7,7 @@
 
 For the ADAPT project (http://adapt-project.com/), the ESIGELEC/IRSEEM is working on the detection of various objects to autonomous mobility of a wheel chair. The aim is to give the ability to see the position of every elements detected by cameras thanks to active vision and Deep Learning algorithms to move to needed objects. 
 
-A usecase is to detect a door (then it handle) to approach the patient to help him to open it. 
+A usecase is to detect a door (then its handle) to approach the patient to help him to open it. 
 
 ## Description:
 
@@ -25,26 +25,22 @@ Here's a brief description of each node of the project:
 
 - The *madnet* node works with tensorflow and provide a disparity map used to get the distance of objects.
 
-- The *post_process* node performs a link between bounding boxes and disparity map. This node is still in construction and another functions to correct distance estimation and box position will be implemented. (mask, histogram correction...). It currently returns the center of the bounding box position in pixel (u,v) with the calculate distances in meter (with the class and score associated). 
-
-- The *spacialize* node convert u, v and z position to a x, y, z position, all in meters. This node will implement a Kalman corrector to perform better performance (using SORT). 
+- The *post_process* node performs a link between bounding boxes and disparity map and convert it into 3D position point. It corrects to position depending the disparity using a mask process. This node is still in construction and another functions to correct distance estimation and box position will be implemented. (histogram correction, Kalman filter...). 
 
 - The *areaMaker* node create 3D boxes that represent objects with specific IDs. Every objects added to a box with the same class name might reprensent the same object and it correct it position and existence score. Every objects are placed in a global referential by knowing the position of the camera (T265). 
 
-- The *animated3Dplot* node is only used to visualize the position of the 3D boxes. This is currently a very basic program that will be upgrade later for a better utilisation. 
+- The *visualizer* node is only used to visualize the position of the 3D boxes with rviz. 
 
 ## Usage:
 
 For now, no usable roslaunch have been created. Run every scripts by hand in different terminal to proceed. 
 
-- Use Realsense package for D435 cameras: `roslaunch realsense2_camera rs_camera.launch`
-- Use T265 data: `python data_processing/scripts/t265.py`
+- Use Realsense package for D435 and T265 cameras: `roslaunch realsense2_camera rs_d400_and_t_265.launch`
 - Detection : `python yolo_madnet/scripts/detection.py`
 - Distance estimation (MADNet) : `python yolo_madnet/scripts/madnet.py`
 - Post-processing : `python yolo_madnet/scripts/post_process.py`
-- Spacialize : `python data_processing/scripts/spacialize.py`
 - Create area for objects : `python data_processing/scripts/areaMaker.py`
-- Show area in OpenGL viewer : `python data_processing/scripts/animated3Dplot.py`
+- Publish area to be visualize in rviz : `python data_processing/scripts/visualizer.py`
 
 ## Requirements:
 
@@ -60,11 +56,6 @@ For now, no usable roslaunch have been created. Run every scripts by hand in dif
 - For image management:
 `numpy`
 `cv2`
-
-- For OpenGL node:
-`pyqtgraph`
-`pyopengl`
-Install PyQt5 with `sudo python -m pip install PyQt5` if asked. 
 
 - For areaMaker node:
 `pyquaternion`
