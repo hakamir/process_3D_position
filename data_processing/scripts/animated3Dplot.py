@@ -10,6 +10,7 @@ import math
 
 import rospy
 from data_processing.msg import ObjectsMsg
+from data_processing.msg import CameraMsg
 from nav_msgs.msg import Odometry
 #from pyquaternion import Quaternion
 
@@ -157,7 +158,8 @@ class Visualizer(object):
         # init ROS tools
         rospy.init_node('mesh_3D_node')
         rospy.Subscriber('/object/position/3D', ObjectsMsg, self.process, queue_size=10)
-        rospy.Subscriber('/t265/odom/sample', Odometry, self.update_cam_position, queue_size=10)
+        #rospy.Subscriber('/t265/odom/sample', Odometry, self.update_cam_position, queue_size=10)
+        rospy.Subscriber('/t265/odom/sample', CameraMsg, self.update_cam_position, queue_size=10)
 
     def process(self, msg):
         """
@@ -196,16 +198,24 @@ class Visualizer(object):
         Move the Intel T265 camera on the GLViewWidget to the known position received.
         """
         # Get the camera position (euler vector) and rotation (quaternion)
-        self.cam_x = msg.pose.pose.position.z
-        self.cam_y = msg.pose.pose.position.x
-        self.cam_z = msg.pose.pose.position.y
+        #self.cam_x = msg.pose.pose.position.z
+        #self.cam_y = msg.pose.pose.position.x
+        #self.cam_z = msg.pose.pose.position.y
         #cam_point = np.matrix([[self.cam_x], [self.cam_y], [self.cam_z]])
+        self.cam_x = msg.linear.x
+        self.cam_y = msg.linear.y
+        self.cam_z = msg.linear.z
 
-        self.cam_rx = msg.pose.pose.orientation.x
-        self.cam_ry = msg.pose.pose.orientation.y
-        self.cam_rz = msg.pose.pose.orientation.z
-        self.cam_rw = msg.pose.pose.orientation.w
+        #self.cam_rx = msg.pose.pose.orientation.x
+        #self.cam_ry = msg.pose.pose.orientation.y
+        #self.cam_rz = msg.pose.pose.orientation.z
+        #self.cam_rw = msg.pose.pose.orientation.w
         #quaternion = Quaternion(self.cam_rw, self.cam_rx, self.cam_ry, self.cam_rz)
+        self.cam_rx = msg.angular.x
+        self.cam_ry = msg.angular.y
+        self.cam_rz = msg.angular.z
+        self.cam_rw = msg.angular.w
+
 
         # Translate to known position of the camera
         self.cam.translate(self.cam_x - self.cam_x_old, self.cam_y - self.cam_y_old, self.cam_z - self.cam_z_old)

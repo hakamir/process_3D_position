@@ -31,6 +31,9 @@ existence probability that can be used to avoid error of detections.
 Program in construction...
 """
 
+global DECAYING_TIME
+DECAYING_TIME = 3
+
 class areaMaker:
 
     def __init__(self):
@@ -39,8 +42,8 @@ class areaMaker:
         rospy.init_node('areamaker_node')
         self.IDs = []
         subObj = message_filters.Subscriber('/object/detected', PointsMsg)
-        #subcampos = message_filters.Subscriber('/t265/odom/sample', Odometry)
         subcampos = message_filters.Subscriber('/t265/odom/sample', Odometry)
+        #subcampos = message_filters.Subscriber('/t265/odom/sample', CameraMsg)
 
         ats = message_filters.ApproximateTimeSynchronizer([subObj, subcampos], queue_size=1, slop=0.1)
         ats.registerCallback(self.process)
@@ -75,6 +78,7 @@ class areaMaker:
             point = np.matrix([[x],[y],[z]])
             _class = pt.obj_class
             score = pt.score
+            scale = (pt.scale.x, pt.scale.y, pt.scale.z)
 
             # Get the camera position (euler vector) and rotation (quaternion)
             cam_x = cameraPosMsg.pose.pose.position.x
@@ -97,10 +101,6 @@ class areaMaker:
 
             quaternion = Quaternion(cam_rw, cam_rx, cam_ry, cam_rz)
 
-            # Set an arbitrary scale of the mesh
-            # MUST BE DEPENDANT OF THE CLASS OF THE OBJECT IN THE FUTURE
-            scale = (1,1,1)
-
             redondance = 0
 
             # Print the point position in the camera and global referentials
@@ -119,6 +119,7 @@ class areaMaker:
             for item in self.obj_list:
                 print(Fore.BLUE + "#-----------Item {}-----------#".format(self.obj_list.index(item)) + Style.RESET_ALL)
                 print("Object center: \n{}".format(item.get_center()))
+                print("Object scale: \n{}".format(item.get_scale()))
                 print("Object class: \n{}".format(item.get_class()))
                 print("Object score: \n{}".format(round(item.get_score(),2)))
                 print("Object ID: \n{}".format(item.get_ID()))
@@ -154,7 +155,7 @@ class areaMaker:
                     dt = time.time() - item.get_last_detection_time()
                     print("Last detection: \n{}".format(round(dt,6)))
                     # If an object haven't been detected since a specific time, remove it.
-                    if dt > 10:
+                    if dt > DECAYING_TIME:
                         self.obj_list.remove(item)
 
                 # Avoid synchronization error (rare normally)
@@ -163,6 +164,7 @@ class areaMaker:
 
                 # get all data Publish the position of the object
                 msg_center = item.get_center()
+                msg_scale = item.get_scale()
                 msg_rotation = item.get_quaternion()
                 msg_class = item.get_class()
                 msg_score = item.get_score()
@@ -176,15 +178,19 @@ class areaMaker:
                 object.center.x = msg_center[0]
                 object.center.y = msg_center[1]
                 object.center.z = msg_center[2]
-                object.rotation.x = msg_rotation[0]
-                object.rotation.y = msg_rotation[1]
-                object.rotation.z = msg_rotation[2]
+                object.scale.x = msg_scale[0]
+                object.scale.y = msg_scale[1]
+                object.scale.z = msg_scale[2]
+                object.rotation.w = msg_rotation[0]
+                object.rotation.x = msg_rotation[1]
+                object.rotation.y = msg_rotation[2]
+                object.rotation.z = msg_rotation[3]
                 object.creation_time = msg_creation_time
                 object.last_detection_time = msg_last_detection_time
                 object.obj_class = msg_class
                 object.score = msg_score
                 object.ID = msg_ID
-                objects.append(object)
+                objects.object.append(object)
 
             # Print the number of detected objects in the environment
             now = rospy.get_rostime()

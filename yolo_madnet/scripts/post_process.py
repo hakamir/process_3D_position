@@ -85,6 +85,17 @@ class post_process:
             Y = distance * self.pixel_size * v * factor
             Z = distance * self.focal * factor
 
+            # Calculate the scale of the bounding box that will be transposed in 3D
+            x_1 = u - (x2 - x1) / 2
+            x_2 = u + (x2 - x1) / 2
+            y_1 = v - (y2 - y1) / 2
+            y_2 = v + (y2 - y1) / 2
+            factor = np.sqrt(1/(self.focal**2 + self.pixel_size**2 * (x_2 - x_1)**2 + self.pixel_size**2 * (y_2 - y_1)**2))
+            a = distance * self.pixel_size * (x_2 - x_1) * factor
+            b = distance * self.pixel_size * (y_2 - y_1) * factor
+            c = np.sqrt(a*b)
+            scale = [a, b, c]
+
             # Now append data to the message
             _class = object.obj_class
             score = object.score
@@ -95,6 +106,9 @@ class post_process:
             point.position.x = X
             point.position.y = Y
             point.position.z = Z
+            point.scale.x = scale[0]
+            point.scale.y = scale[1]
+            point.scale.z = scale[2]
             point.obj_class = _class
             point.score = score
             points_list.point.append(point)
@@ -151,11 +165,11 @@ class post_process:
         disp_seg = np.ma.masked_array(disp_seg, mask=mask)
         median = np.median(disp_seg.data)
         # We now calculate the distance in meter
-        if distance==0:
-            distance=focal_lenght * baseline / (pixel_size*(median + 0.001))
+        if median==0:
+            median=focal_lenght * baseline / (pixel_size*(median + 0.001))
         else:
-            distance=focal_lenght * baseline / (pixel_size*distance)
-        return distance
+            median=focal_lenght * baseline / (pixel_size*median)
+        return median
 
     """
     This function is deprecated
