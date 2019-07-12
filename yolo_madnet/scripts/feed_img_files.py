@@ -12,15 +12,24 @@ import os, sys
 def feed_img():
     parser=argparse.ArgumentParser(description='Feed images from path that will be publish in ros topic /feed/image')
     parser.add_argument("-p","--path", help='path to the images', default=None)
+    parser.add_argument("--resize",help='Resize the image',action='store_true')
     args=parser.parse_args()
     rospy.init_node('feed_img_node')
     bridge = CvBridge()
     pub = rospy.Publisher('/feed/image', Image, queue_size=1)
-    rate = rospy.Rate(5)
+    rate = rospy.Rate(15)
     for img in os.listdir(args.path):
         print(os.path.join(args.path,img))
         cv2_img = cv2.imread(os.path.join(args.path,img))
-        print(cv2_img.shape)
+        print('Original image size: {}'.format(cv2_img.shape))
+        if args.resize:
+            width, height, _ = cv2_img.shape
+            x_factor = 1000 / width
+            y_factor = 1000 / width
+            n_width = int(x_factor * width)
+            n_height = int(y_factor * height)
+            cv2_img = cv2.resize(cv2_img, (n_height, n_width))
+            print('Resized image size: {}'.format(cv2_img.shape))
         msg_img = bridge.cv2_to_imgmsg(cv2_img, "bgr8")
         pub.publish(msg_img)
         rate.sleep()
