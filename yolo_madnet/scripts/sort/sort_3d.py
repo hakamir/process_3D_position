@@ -21,40 +21,30 @@ from __future__ import print_function
 from numba import jit
 import os.path
 import numpy as np
-#import matplotlib.pyplot as plt
-#import matplotlib.patches as patches
-#from skimage import io
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from skimage import io
 from sklearn.utils.linear_assignment_ import linear_assignment
-#import glob
+import glob
 import time
 import argparse
 from filterpy.kalman import KalmanFilter
-try:
-    import cv2
-except ImportError:
-    import sys
-    sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
-    import cv2
-    sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
-from math import tan, pi
-#import random
+import cv2
+import random
 
 
 
-global width,height,f,sx, HFOV, VFOV
-
+global width,height,f,sx
 
 width=1280
 height=720
 f=1.93
 sx=3e-3
-HFOV = 91.2
-VFOV = 65.5
 
 @jit
 
 
-def iou(bb_test,bb_gt):
+def iou(bb_test,bb_gt,mesured_distance,predicted_distance):
   """
   Computes IUO between two bboxes in the form [x1,y1,x2,y2]
   """
@@ -62,17 +52,18 @@ def iou(bb_test,bb_gt):
   yy1 = np.maximum(bb_test[1], bb_gt[1])
   xx2 = np.minimum(bb_test[2], bb_gt[2])
   yy2 = np.minimum(bb_test[3], bb_gt[3])
+  zz1=np.maximum(mesured_distance,predicted_distance)
+  zz2=np.minimum(mesured_distance+2,predicted_distance+2)
   w = np.maximum(0., xx2 - xx1)
   h = np.maximum(0., yy2 - yy1)
-  wh = w * h
-  o = wh / ((bb_test[2]-bb_test[0])*(bb_test[3]-bb_test[1])
-    + (bb_gt[2]-bb_gt[0])*(bb_gt[3]-bb_gt[1]) - wh)
+  d=np.maximum(0., zz2 - zz1)
+  whd = w * h*d
+  o = whd / ((bb_test[2]-bb_test[0])*(bb_test[3]-bb_test[1])*2
+    + (bb_gt[2]-bb_gt[0])*(bb_gt[3]-bb_gt[1])*2 - whd)
   return(o)
 
-"""
-
-file_dir_path="/home/amphani/catkin_ws/src/data_processing/data/moving/npy/"
-img_dir_path="/home/amphani/catkin_ws/src/data_processing/data/moving/images/"
+file_dir_path="/media/antoine/Disque dur portable/Detection+Depth/Yolov3_Stereo_depth_multithread/output/Mesure_erreur_GTv3/MAD/estimation_npy/"
+img_dir_path="/media/antoine/Disque dur portable/Datasets/RealSense/python/v2/frames/1/"
 
 def get_file_number(file):
     number=os.path.splitext(file)[0]
@@ -84,20 +75,18 @@ file_list=sorted(file_list,key=get_file_number)
 img_list=[img_dir_path + file_name for file_name in os.listdir(img_dir_path)]
 img_list=sorted(img_list,key=get_file_number)
 
-"""
-
 def plot_one_box(x, img, color=None, label=None, line_thickness=None):
     # Plots one bounding box on image img
     tl = line_thickness or round(0.002 * max(img.shape[0:2])) + 1  # line thickness
     color = color
     c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
-    cv2.rectangle(img, c1, c2, color, thickness=int(tl))
+    cv2.rectangle(img, c1, c2, color, thickness=tl)
     if label:
         tf = max(tl - 1, 1)  # font thickness
-        t_size = cv2.getTextSize(label, 0, fontScale=int(tl) / 3, thickness=int(tf))[0]
+        t_size = cv2.getTextSize(label, 0, fontScale=tl / 3, thickness=tf)[0]
         c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
         cv2.rectangle(img, c1, c2, color, -1)  # filled
-        cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3, [225, 255, 255], thickness=int(tf), lineType=cv2.LINE_AA)
+        cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3, [225, 255, 255], thickness=tf, lineType=cv2.LINE_AA)
 
 def convert_bbox_to_z(bbox,distance):
   """
@@ -114,30 +103,7 @@ def convert_bbox_to_z(bbox,distance):
   X=(x-width/2)*distance*sx/float(f)
   Y=(y-height/2)*distance*sx/float(f)
   Z=distance
-#  print(X, Y, Z)
   return np.array([X,Y,Z,s,r]).reshape((5,1))
-
-"""
-def convert_bbox_to_z_rod(bbox, distance):
-
-#    z = (self.focal*self.baseline)/(self.pixel_size*distance) # convert disparity to meters
-    fx = (width/2)/tan(HFOV/2 * pi/180)		# Focal in pixel (x)
-    fy = (height/2)/tan(VFOV/2 * pi/180)	# Focal in pixel (y)
-
-
-    w = bbox[2]-bbox[0]
-    h = bbox[3]-bbox[1]
-    u = bbox[0]+w/2.
-    v = bbox[1]+h/2.
-
-    s=w*h
-    r = w/float(h)
-    z = distance
-    x = (u - width/2) * z / fx
-    y = (v - height/2) * z / fy
-
-    return np.array([x,y,z,s,r]).reshape((5,1))
-"""
 
 def convert_x_to_bbox(x,score=None):
   """
@@ -147,7 +113,7 @@ def convert_x_to_bbox(x,score=None):
 
   x_centre=x[0]*f/(x[2]*sx)+width/2
   y_centre=x[1]*f/(x[2]*sx)+height/2
-  w = np.sqrt(x[3]*x[4])
+  w = np.sqrt(abs(x[3]*x[4]))
   h = x[3]/w
   x1=x_centre-w/2.
   y1=y_centre-h/2.
@@ -158,6 +124,13 @@ def convert_x_to_bbox(x,score=None):
   else:
     return np.array([x1,y1,x2,y2,score]).reshape((1,5))
 
+def convert_3d_prediction_to_img_coord(x):
+    """
+    takes 3d coord in the form [X,Y,Z] and return a [u,v] array
+    """
+    u=x[0]*f/(x[2]*sx)+width/2
+    v=x[1]*f/(x[2]*sx)+height/2
+    return [int(u),int(v)]
 
 class KalmanBoxTracker(object):
   """
@@ -174,10 +147,12 @@ class KalmanBoxTracker(object):
     self.kf.H = np.array([[1,0,0,0,0,0,0,0,0],[0,1,0,0,0,0,0,0,0],[0,0,1,0,0,0,0,0,0],[0,0,0,1,0,0,0,0,0],[0,0,0,0,1,0,0,0,0]])
 
     self.kf.R[3:,3:] *= 10.
-    self.kf.R[2,2]*=5
+    self.kf.R[2,2]*=130.
     self.kf.P[5:,5:] *= 1000. #give high uncertainty to the unobservable initial velocities
     self.kf.P *= 10.
     self.kf.Q[-1,-1] *= 0.01
+    self.kf.Q[-2,-2] *= 1e-2
+    self.kf.Q[2,2] *= 0.01
     self.kf.Q[5:,5:] *= 0.01
 
     self.kf.x[:5] = convert_bbox_to_z(bbox,distance)
@@ -211,7 +186,6 @@ class KalmanBoxTracker(object):
       self.hit_streak = 0
     self.time_since_update += 1
     self.history.append(convert_x_to_bbox(self.kf.x))
-#    self.history.append(self.kf.x)
     return self.history[-1]
 
   def x_prediction(self):
@@ -229,13 +203,7 @@ class KalmanBoxTracker(object):
     """
     return convert_x_to_bbox(self.kf.x)
 
-  def get_state_space(self):
-    """
-    Returns the current position in space
-    """
-    return self.kf.x
-
-def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
+def associate_detections_to_trackers(detections,trackers,predicted_distances,mesured_distances,iou_threshold = 0.3):
   """
   Assigns detections to tracked object (both represented as bounding boxes)
 
@@ -246,8 +214,10 @@ def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
   iou_matrix = np.zeros((len(detections),len(trackers)),dtype=np.float32)
 
   for d,det in enumerate(detections):
+    mesured_distance=mesured_distances[d]
     for t,trk in enumerate(trackers):
-      iou_matrix[d,t] = iou(det,trk)
+      predicted_distance=predicted_distances[t]
+      iou_matrix[d,t] = iou(det,trk,mesured_distance,predicted_distance)
   matched_indices = linear_assignment(-iou_matrix)
 
   unmatched_detections = []
@@ -301,17 +271,24 @@ class Sort(object):
     to_del = []
     ret = []
     pred=[]
-    ret_space=[]
-    pred_space=[]
+    predicted_state=[]
+    state_x=[]
+    output=[]
+    predicted_distances=[]
     for t,trk in enumerate(trks):
       pos = self.trackers[t].predict()[0]
+      state=self.trackers[t].kf.x
+      distance=state[2]
+      predicted_distances.append(distance)
       trk[:] = [pos[0], pos[1], pos[2], pos[3], 0]
       if(np.any(np.isnan(pos))):
         to_del.append(t)
     trks = np.ma.compress_rows(np.ma.masked_invalid(trks))
+    if len(predicted_distances)>0:
+        predicted_distances=np.concatenate(predicted_distances)
     for t in reversed(to_del):
       self.trackers.pop(t)
-    matched, unmatched_dets, unmatched_trks = associate_detections_to_trackers(dets,trks)
+    matched, unmatched_dets, unmatched_trks = associate_detections_to_trackers(dets,trks,predicted_distances,distances)
 
     #update matched trackers with assigned detections
     for t,trk in enumerate(self.trackers):
@@ -327,40 +304,65 @@ class Sort(object):
     for trk in reversed(self.trackers):
         trk.is_valid(self.min_hits)
         d = trk.get_state()[0]
-        d_space = trk.get_state_space()
-#        future_pos=trk.x_prediction()
+        current_state=trk.kf.x
+        compa_prediction=np.array([[current_state[0]+current_state[5]],
+                                   [current_state[1]+current_state[6]],
+                                   [current_state[2]+current_state[7]],
+                                   [current_state[3]+current_state[8]],
+                                   [current_state[4]],
+                                   [current_state[5]],
+                                   [current_state[6]],
+                                   [current_state[7]],
+                                   [current_state[8]]])[:,:,0]
+#        c_future_pos=trk.x_prediction()
         if((trk.time_since_update < 1) and (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits)):
-            ret.append(np.concatenate((d,[trk.id+1])).reshape(1,-1)) # +1 as MOT benchmark requires positive
-            ret_space.append(np.concatenate(d_space))
+          ret.append(np.concatenate((d,[trk.id+1])).reshape(1,-1)) # +1 as MOT benchmark requires positive
         elif(trk.valided):
             pred.append(np.concatenate((d,[trk.id+1])).reshape(1,-1))
-            pred_space.append(np.concatenate(d_space))
+        if (trk.valided):
+            predicted_state.append(np.concatenate((compa_prediction[:,0],[trk.id+1])).reshape(1,-1))
+            state_x.append(np.concatenate((current_state[:,0],[trk.id+1])).reshape(1,-1))
+
+
+
         i -= 1
         #remove dead tracklet
         if(trk.time_since_update > self.max_age):
           self.trackers.pop(i)
-    if(len(ret)>0):
-        if(len(pred)>0):
-            return np.concatenate(ret),np.concatenate(pred),np.concatenate(ret_space),np.concatenate(pred_space)
-        else:
-            return np.concatenate(ret),[],np.concatenate(ret_space),[]
-    if(len(pred)>0):
-        return [],np.concatenate(pred),[],np.concatenate(pred_space)
-    return np.empty((0,5)),np.empty((0,5)),np.empty((0,5)),np.empty((0,5))
+    output.append((ret,pred,predicted_state,state_x))
+    return output
+#    if(len(ret)>0):
+#        if(len(pred)>0):
+#            return np.concatenate(ret),np.concatenate(pred)
+#        else:
+#            return np.concatenate(ret),[]
+#    if(len(pred)>0):
+#        return [],np.concatenate(pred)
+#    return np.empty((0,5)),np.empty((0,5))
+
+
+
+
+
+
 
 def parse_args():
     """Parse input arguments."""
     parser = argparse.ArgumentParser(description='SORT demo')
-    parser.add_argument('--display', dest='display', help='Display online tracker output (slow) [False]',action='store_true')
+    parser.add_argument('--output', dest='output', default='output/calibv3_vitesse/',action='store_true')
     args = parser.parse_args()
     return args
 
-"""
+
 
 if __name__ == '__main__':
   # all trai
   args = parse_args()
-  display = args.display
+  if not os.path.exists(args.output):
+        os.makedirs(args.output)
+  if not os.path.exists(args.output+"predictions/"):
+        os.makedirs(args.output+"predictions/")
+#  display = args.display
   phase = 'train'
   total_time = 0.0
   total_frames = 0
@@ -368,16 +370,20 @@ if __name__ == '__main__':
   colours*=255
 
 
-  if not os.path.exists('output'):
-    os.makedirs('output')
+#  if not os.path.exists('output'):
+#    os.makedirs('output')
 
 
   mot_tracker = Sort() #create instance of the SORT tracker
-  with open('output/out.txt','w') as out_file:
+  with open(args.output+'out.txt','w') as out_file:
+      history_prediction=[]
+      distance_error_list=[]
       for frame in range(len(file_list)):
         original_img=cv2.imread(img_list[frame])
         data=np.load(file_list[frame])
         frame += 1 #detection and frame numbers begin at 1
+        if frame==685:
+            print('nique')
         if len(data)>0:
             dets=data[:,0:4]
             distances=data[:,4]
@@ -386,16 +392,28 @@ if __name__ == '__main__':
             distances=[]
         total_frames += 1
 
+
+        if frame==333:
+            print('ok')
         start_time = time.time()
-        trackers,predictions,trackers_space,predictions_space = mot_tracker.update(dets,distances)
+#        trackers,predictions = mot_tracker.update(dets,distances)
+        trackers,predictions,predicted_state,state_x=np.array(mot_tracker.update(dets,distances)[0])
+        if len(trackers)>0:
+            trackers=np.concatenate(trackers)
+        if len(predicted_state)>0:
+            predicted_state=np.concatenate(predicted_state)
+        if len(predictions)>0:
+            predictions=np.concatenate(predictions)
+        if len(state_x)>0:
+            state_x=np.concatenate(state_x)
         cycle_time = time.time() - start_time
         total_time += cycle_time
 
         for d in trackers:
           x1,y1,x2,y2=int(d[0]),int(d[1]),int(d[2]),int(d[3])
-          distance=np.sqrt(trackers_space[0]**2 + trackers_space[1]**2 + trackers_space[2]**2)
-          label=" distance= %.2fm"%distance
-#          label=str(d[4])
+#          distance=get_object_distance(self.disp,x1,y1,x2,y2,args.focal_lenght,args.baseline,args.pixel_size)
+#          label=self.labels[j]+" distance= %.2fm"%distance
+          label=str(d[4])
           plot_one_box([x1, y1, x2, y2], original_img, label=label, color=colours[int(d[4])-1])
 
           print('%d,%d,%.2f,%.2f,%.2f,%.2f,1,-1,-1,-1'%(frame,d[4],d[0],d[1],d[2]-d[0],d[3]-d[1]),file=out_file)
@@ -403,16 +421,62 @@ if __name__ == '__main__':
 
         for d in predictions:
           x1,y1,x2,y2=int(d[0]),int(d[1]),int(d[2]),int(d[3])
-          distance=np.sqrt(predictions_space[0]**2 + predictions_space[1]**2 + predictions_space[2]**2)
-          label="Prediction distance= %.2fm"%distance
-#          label=str(d[4])+' prediction'
+          label=str(d[4])+' prediction'
           plot_one_box([x1, y1, x2, y2], original_img, label=label, color=colours[int(d[4])-1])
 
           print('%d,%d,%.2f,%.2f,%.2f,%.2f,1,-1,-1,-1'%(frame,d[4],d[0],d[1],d[2]-d[0],d[3]-d[1]),file=out_file)
-        cv2.imwrite('output/img/out%06i.png'%frame,original_img)
+
+        np.save(args.output+"predictions/pred%06i.npy"%frame,predicted_state)
+        for d in predicted_state:
+            idx=d[9]
+#            x=d[0:3]
+#            pixel_coord=convert_3d_prediction_to_img_coord(x)
+
+            x=d[0:5]
+            pixels=convert_x_to_bbox(x)[0]
+            x1,y1,x2,y2=int(pixels[0]),int(pixels[1]),int(pixels[2]),int(pixels[3])
+            label=str(int(idx))+' prediction'
+#            plot_one_box([x1, y1, x2, y2], original_img, label=label, color=colours[int(idx)+100])
+            pixel_coord=[int((x2+x1)/2),int((y2+y1)/2)]
+            if len(trackers)>0:
+                row=np.where(trackers[:,4]==idx)
+                if(len(row[0]))>0:
+                    x1,y1,x2,y2=int(trackers[row[0][0],0]),int(trackers[row[0][0],1]),int(trackers[row[0][0],2]),int(trackers[row[0][0],3])
+
+                    original_position=[int((x2+x1)/2.),int((y2+y1)/2.)]
+                    cv2.arrowedLine(original_img,(original_position[0],
+                                                  original_position[1]),(pixel_coord[0],pixel_coord[1]),
+                                                  colours[int(idx)-1,:],thickness = 2)
+                    vitesses=[d[5]*30,d[6]*30,d[7]*30]
+                    vitesse_globale=np.sqrt(vitesses[0]**2+vitesses[1]**2+vitesses[2]**2)
+#                    label="vx:%.3f m/s   vy:%.3f m/s   vz:%.3f m/s   v:%.3f m/s"%(vitesses[0],vitesses[1],vitesses[2],vitesse_globale)
+                    label="v:%.3f m/s"%vitesse_globale
+                    plot_one_box([x1, y1, x2, y2], original_img, label=label, color=colours[int(idx)-1])
+            if len(predictions)>0:
+                row=np.where(predictions[:,4]==idx)
+                if(len(row[0]))>0:
+                    x1,y1,x2,y2=int(predictions[row[0][0],0]),int(predictions[row[0][0],1]),int(predictions[row[0][0],2]),int(predictions[row[0][0],3])
+
+                    original_position=[int((x2+x1)/2.),int((y2+y1)/2.)]
+                    cv2.arrowedLine(original_img,(original_position[0],
+                                                  original_position[1]),(pixel_coord[0],
+                                                                   pixel_coord[1]),colours[int(idx)-1,:],thickness = 2)
+
+        history_prediction.append(predicted_state)
+        distance_error=[]
+        if len(history_prediction[frame-2])>0:
+            if len(state_x)>0:
+                for d in history_prediction[frame-2]:
+                    row=np.where(state_x[:,9]==d[9])[0]
+                    if len(trackers)>0:
+                        if len(np.where(trackers[:,4]==d[9])[0])>0:
+                            if len(row)>0:
+                                distance_error.append(np.sqrt((state_x[row[0],0]-d[0])**2+(state_x[row[0],1]-d[1])**2+(state_x[row[0],2]-d[2])**2))
+        distance_error_list.append(distance_error)
+        cv2.imwrite(args.output+'out%06i.png'%frame,original_img)
 
 
 
   print("Total Tracking took: %.3f for %d frames or %.1f FPS"%(total_time,total_frames,total_frames/total_time))
-
-"""
+  distance_error_list=np.concatenate(distance_error_list)
+  mean_error=sum(distance_error_list)/len(distance_error_list)

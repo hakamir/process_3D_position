@@ -8,13 +8,24 @@ from yolo_madnet.msg import DetectionMsg
 from data_processing.msg import PointMsg
 from data_processing.msg import PointsMsg
 from cv_bridge import CvBridge, CvBridgeError
+
 import cv2
+"""
+try:
+    import cv2
+except ImportError:
+    import sys
+    sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+    import cv2
+    sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
+"""
 import random
 
 import numpy as np
 import time
 
 from sort.utils.object_segmentation import segmentation
+#from sort.sort_3d import Sort
 
 class post_process:
     """
@@ -38,7 +49,7 @@ class post_process:
         self.pixel_size = 3e-6
 
         # Loading class names file and generate random colors for bounding boxes
-        self.classes = self.load_classes('yolov3/data/coco.names')
+        self.classes = self.load_classes('adapt/adapt.names')
         self.colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(self.classes))]
         self.bridge = CvBridge()
 
@@ -74,8 +85,11 @@ class post_process:
             # We get the distance in meter
             # It correspond to the direct distance from the focal point, not z
             distance = self.disp_mask(mask[0][0], disparity, bbox)
+            #distance = self.get_object_distance(mask, disparity, bbox,
+            #            focal_lenght=1.93, baseline=49.867050, pixel_size=3)
 
             # We define the position of the object on the image at the center of the box
+            #distance = ((2.0/3.0)*self.focal*self.baseline)/(self.pixel_size*disparity[(x2 - x1)/2][(y2 - y1)/2]/255)
             u = (x2 - x1) / 2 + x1 - img.shape[1]/2
             v = (y2 - y1) / 2 + y1 - img.shape[0]/2
 
@@ -120,13 +134,14 @@ class post_process:
                     color_index = self.classes.index(cls)
             self.plot_one_box(bbox, img, label=label, color=self.colors[color_index])
 
-        # Publish the visualisation of bounding box with distance
+        # Publish the visualisation of bounding box with distance and mask
         self.pub_img.publish(self.bridge.cv2_to_imgmsg(img, "rgb8"))
         # Publish the message
         now = rospy.get_rostime()
         points_list.header.stamp.secs = now.secs
         points_list.header.stamp.nsecs = now.nsecs
         self.pub.publish(points_list)
+        print(points_list)
 
     def load_classes(self, path):
         # Loads *.names file at 'path'
@@ -160,15 +175,16 @@ class post_process:
     """
     def disp_mask(self, mask, disp, bbox, focal_lenght=1.93e-3, baseline=49.867050e-3, pixel_size=3e-6):
         x1, y1, x2, y2 = bbox
+        # We crop the disparity map image to the bounding box position
         disp_seg=disp[y1:y2,x1:x2]/255
         # We keep only the disparity values of the bounding box that aren't masked
         disp_seg = np.ma.masked_array(disp_seg, mask=mask)
         median = np.median(disp_seg.data)
         # We now calculate the distance in meter
         if median==0:
-            median=focal_lenght * baseline / (pixel_size*(median + 0.001))
+            median= ((2.0/3.0) * focal_lenght * baseline) / (pixel_size*(median + 0.001))
         else:
-            median=focal_lenght * baseline / (pixel_size*median)
+            median= ((2.0/3.0) * focal_lenght * baseline) / (pixel_size*median)
         return median
 
     """

@@ -5,7 +5,6 @@ import message_filters
 from data_processing.msg import ObjectMsg
 from data_processing.msg import ObjectsMsg
 from data_processing.msg import PointsMsg
-from data_processing.msg import CameraMsg
 from nav_msgs.msg import Odometry
 
 from object_creator import object_creator
@@ -32,7 +31,7 @@ Program in construction...
 """
 
 global DECAYING_TIME
-DECAYING_TIME = 3
+DECAYING_TIME = 120
 
 class areaMaker:
 
@@ -43,12 +42,10 @@ class areaMaker:
         self.IDs = []
         subObj = message_filters.Subscriber('/object/detected', PointsMsg)
         subcampos = message_filters.Subscriber('/t265/odom/sample', Odometry)
-        #subcampos = message_filters.Subscriber('/t265/odom/sample', CameraMsg)
-
-        ats = message_filters.ApproximateTimeSynchronizer([subObj, subcampos], queue_size=1, slop=0.1)
+        ats = message_filters.ApproximateTimeSynchronizer([subObj, subcampos], queue_size=2, slop=0.01)
         ats.registerCallback(self.process)
         self.obj_list = []
-        self.pub = rospy.Publisher('/object/position/3D', ObjectsMsg, queue_size=10)
+        self.pub = rospy.Publisher('/object/position/3D', ObjectsMsg, queue_size=1)
         self.time =time.time()
         rospy.spin()
 
@@ -69,6 +66,7 @@ class areaMaker:
         start = time.time()
 
         objects = ObjectsMsg()
+        redondance = 0
 
         for pt in pointsMsg.point:
             # Get the point position, class and score
@@ -84,24 +82,23 @@ class areaMaker:
             cam_x = cameraPosMsg.pose.pose.position.x
             cam_y = cameraPosMsg.pose.pose.position.y
             cam_z = cameraPosMsg.pose.pose.position.z
-            #cam_x = cameraPosMsg.linear.x
-            #cam_y = cameraPosMsg.linear.y
-            #cam_z = cameraPosMsg.linear.z
             cam_point = np.matrix([[cam_x], [cam_y], [cam_z]])
 
             cam_rx = cameraPosMsg.pose.pose.orientation.x
             cam_ry = cameraPosMsg.pose.pose.orientation.y
             cam_rz = cameraPosMsg.pose.pose.orientation.z
             cam_rw = cameraPosMsg.pose.pose.orientation.w
-            #cam_rx = cameraPosMsg.angular.x
-            #cam_ry = cameraPosMsg.angular.y
-            #cam_rz = cameraPosMsg.angular.z
-            #cam_rw = cameraPosMsg.angular.w
-    #        cam_rot = np.matrix([[cam_rx], [cam_ry], [cam_rz], [cam_rw]])
-
             quaternion = Quaternion(cam_rw, cam_rx, cam_ry, cam_rz)
 
-            redondance = 0
+            # The T265 tracking camera was set looking backward.
+            # Then, the X and Z axis are inverted.
+            cam_x = - cam_x
+            cam_z = - cam_z
+            # The rotation might be taken in consideration
+            #TODO
+            #quaternion.rotate()
+
+            #scale = (1,1,1)
 
             # Print the point position in the camera and global referentials
             print(Fore.BLUE + "\nPoint position: ")
@@ -111,7 +108,7 @@ class areaMaker:
             print("Global referential: \n{}".format(global_point))
             print(Fore.BLUE + "#-----------ALL OBJECTS-----------#")
 
-            # If no object exist, we create a new mesh at the given position of the added point
+            # If no object exists, we create a new mesh at the given position of the added point
             if len(self.obj_list) == 0:
                 self.obj_list.append(object_creator(point, cam_point, scale, quaternion, _class, score, len(self.obj_list)))
 
@@ -129,18 +126,17 @@ class areaMaker:
                     print(Fore.GREEN + 'Point is inside.' + Style.RESET_ALL)
 
                     # Perform calibration
-                    item.add_point(point, cam_point, quaternion, score)
-                    item.set_last_detection_time()
+                    item.add_point(point, cam_point, quaternion, score, scale)
                     print("Iteration: {}".format(item.get_iteration()))
 
                     # We verify if the point is in many existence area of the same class
                     redondance += 1
-                    print("redondance: {}".format(redondance))
 
                     # We correct the duplication problem by removing an overcrafting of mesh
                     if redondance > 1:
                         self.obj_list.remove(item)
                         break
+                    print("redondance: {}".format(redondance))
 
                     # Say that no object must be created
                     lock_obj_creator = True
@@ -157,6 +153,7 @@ class areaMaker:
                     # If an object haven't been detected since a specific time, remove it.
                     if dt > DECAYING_TIME:
                         self.obj_list.remove(item)
+
 
                 # Avoid synchronization error (rare normally)
                 except AttributeError:
@@ -200,7 +197,7 @@ class areaMaker:
             print("Detected objects: {}".format(len(self.obj_list)))
 
             # Create a new object (a limit is added for the test)
-            if not lock_obj_creator:
+            if not lock_obj_creator and len(self.obj_list) < 50:
                 self.obj_list.append(object_creator(point, cam_point, scale, quaternion, _class, score, len(self.obj_list)))
             print("Processing time: {} ms".format(round((time.time()-start)*1000,3)))
 

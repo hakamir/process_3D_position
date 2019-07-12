@@ -70,10 +70,11 @@ class madnet:
         rospy.init_node('madnet_node')
         sub_l = message_filters.Subscriber('/d435/infra1/image_rect_raw', Image)
         sub_r = message_filters.Subscriber('/d435/infra2/image_rect_raw', Image)
-        ats = message_filters.ApproximateTimeSynchronizer([sub_l, sub_r], queue_size=1, slop=0.01)
+        ats = message_filters.ApproximateTimeSynchronizer([sub_l, sub_r], queue_size=10, slop=0.5)
         ats.registerCallback(self.process)
         self.pub = rospy.Publisher('/disparity', Image, queue_size=1)
         self.msg_pub = DisparityMsg()
+        self.start = time.time()
         rospy.spin()
 
     def scale_tensor(self,tensor,scale):
@@ -247,7 +248,6 @@ class madnet:
     def process(self, msg_l, msg_r):
         try:
             # Input image from topic
-            start = time.time()
             img_l = self.bridge.imgmsg_to_cv2(msg_l, "bgr8")
             img_r = self.bridge.imgmsg_to_cv2(msg_r, "bgr8")
             #fetch new network portion to train
@@ -338,7 +338,8 @@ class madnet:
                 out_img=dispy_to_save*255
                 self.pub.publish(self.bridge.cv2_to_imgmsg(out_img, "32FC1"))
             self.step+=1
-            print('FPS: {}'.format(int(1 / (time.time() - start))))
+            print('FPS: {}'.format(int(1 / (time.time() - self.start))))
+            self.start = time.time()
         except tf.errors.OutOfRangeError:
         	pass
     	finally:

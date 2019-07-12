@@ -41,6 +41,7 @@ class detection:
         ats.registerCallback(self.process)
         #sub_l = rospy.Subscriber('/d435/infra1/image_rect_raw', Image, self.process, queue_size=10)
         self.pub = rospy.Publisher('/detection/image', DetectionMsg, queue_size=1)
+        self.start = time.time()
         rospy.spin()
 
     """
@@ -56,13 +57,14 @@ class detection:
         self.nms_thres = 0.5
         # Path to config and weights files
         # For yolov3 spp
-        cfg = 'yolov3/cfg/yolov3-spp.cfg'
-        weights = 'yolov3/weights/yolov3-spp.weights'
-        class_names = 'yolov3/data/coco.names'
+        #cfg = 'yolov3/cfg/yolov3-spp.cfg'
+        #weights = 'yolov3/weights/yolov3-spp.weights'
+        #class_names = 'yolov3/data/coco.names'
         # For ADAPT dataset
-        #cfg = 'adapt/yolov3-adapt.cfg'
+        cfg = 'adapt/yolov3-adapt.cfg'
         #weights = 'adapt/yolov3-adapt_best.weights'
-        #class_names = 'adapt/adapt.names'
+        weights = 'adapt/best.pt'
+        class_names = 'adapt/adapt.names'
 
         # Load model and weights
         print('Loading models...')
@@ -86,7 +88,6 @@ class detection:
     def process(self, msg):
         # Input image from topic
         #os.system('clear')
-        start = time.time()
         msg_detection = DetectionMsg()
         try:
             img = self.bridge.imgmsg_to_cv2(msg, "bgr8")
@@ -125,8 +126,9 @@ class detection:
                 msg_bbox.obj_class = label
                 msg_bbox.score = score
                 msg_detection.bbox.append(msg_bbox)
-                #plot_one_box(pos, orig_img, label=label, color=self.colors[int(det[item][6])])
-        print('FPS: {}'.format(int(1 / (time.time() - start))))
+                plot_one_box(pos, orig_img, label=label, color=self.colors[int(det[item][6])])
+        print('FPS: {}'.format(int(1 / (time.time() - self.start))))
+        self.start = time.time()
         msg_detection.image = self.bridge.cv2_to_imgmsg(orig_img, "rgb8")
         self.pub.publish(msg_detection)
 

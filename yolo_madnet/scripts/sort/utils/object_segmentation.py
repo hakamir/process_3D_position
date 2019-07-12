@@ -32,8 +32,7 @@ def segmentation(bbox,disparity,image):
 
     # create the mask by segmenting the disparity with Otsu
     segmented_image=cv2.threshold(disp_seg,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
-
-    #get the first and last indx of non-zero values on the x axis at mid height
+    #get the first and last index of non-zero values on the x axis at mid height
     #to get the new x1 and x2 (we keep the same y1 and y2 because we don't care about y axis too much)
     non_zero_indx=np.nonzero(segmented_image[int(len(segmented_image)/2),:])[0]
     if len(non_zero_indx)==0:
@@ -49,7 +48,6 @@ def segmentation(bbox,disparity,image):
 
     alpha=0.1
     cv2.addWeighted(mask_resized, alpha, image, 1 - alpha,0, image)
-
 
     masks.append((segmented_image,new_x1,y1,new_x2,y2))
     masks=np.array(masks)
