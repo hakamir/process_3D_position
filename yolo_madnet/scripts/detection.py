@@ -35,8 +35,8 @@ class detection:
         self.bridge = CvBridge()
         rospy.init_node('detection_node')
         #sub_l = rospy.Subscriber('/usb_cam/image_raw', Image, self.process, queue_size=10)
-        sub_l = message_filters.Subscriber('/d435/infra1/image_rect_raw', Image)
-        #sub_l = message_filters.Subscriber('/usb_cam/image_raw', Image)
+        #sub_l = message_filters.Subscriber('/d435/infra1/image_rect_raw', Image)
+        sub_l = message_filters.Subscriber('/feed/image', Image)
         ats = message_filters.ApproximateTimeSynchronizer([sub_l], queue_size=1, slop=0.001)
         ats.registerCallback(self.process)
         #sub_l = rospy.Subscriber('/d435/infra1/image_rect_raw', Image, self.process, queue_size=10)
@@ -63,7 +63,7 @@ class detection:
         # For ADAPT dataset
         cfg = 'adapt/yolov3-adapt.cfg'
         #weights = 'adapt/yolov3-adapt_best.weights'
-        weights = 'adapt/best.pt'
+        weights = '/home/zhaoqi/weights/best.pt'
         class_names = 'adapt/adapt.names'
 
         # Load model and weights
@@ -126,7 +126,7 @@ class detection:
                 msg_bbox.obj_class = label
                 msg_bbox.score = score
                 msg_detection.bbox.append(msg_bbox)
-                plot_one_box(pos, orig_img, label=label, color=self.colors[int(det[item][6])])
+                #plot_one_box(pos, orig_img, label=label, color=self.colors[int(det[item][6])])
         print('FPS: {}'.format(int(1 / (time.time() - self.start))))
         self.start = time.time()
         msg_detection.image = self.bridge.cv2_to_imgmsg(orig_img, "rgb8")
