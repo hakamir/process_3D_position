@@ -1,9 +1,22 @@
+#! /usr/bin/python
+# -*- coding: utf-8 -*-
+"""
+@author: Rodolphe Latour
+"""
 import rospy
 from visualization_msgs.msg import Marker
 from data_processing.msg import ObjectsMsg
 import random, time
 
 class visualizer:
+    """
+    Description:
+    ============
+    A simple ROS node to publish 3D box in rviz.
+
+    It manages the object data by taking in account the class, the ID, the
+    position, the rotation and the scale of the object.
+    """
     def __init__(self):
         rospy.init_node('visualizer')
         rospy.Subscriber('/object/position/3D', ObjectsMsg, self.process, queue_size=10)
@@ -19,6 +32,40 @@ class visualizer:
         return list(filter(None, names))  # filter removes empty strings (such as last line)
 
     def process(self, msg):
+        """
+        Description:
+        ============
+        The process function. It publishes markers for each object in entry.
+
+        Input:
+        ------
+        - Objects: A list of object containing specific data.
+            * Vector3 center:
+             -- x: the x position in space (relative to the global position)
+             -- y: the y position in space (relative to the global position)
+             -- z: the z position in space (relative to the global position)
+
+            * Quaternion rotation: The rotation of the object
+
+            * Vector3 scale
+             -- scale_x: the scale in x of the box based on the bounding box
+             -- scale_y: the scale in y of the box based on the bounding box
+             -- scale_z: the scale in z of the box based on the bounding box
+
+            * float64 creation_time: the creation time of the object
+
+            * float64 last_detection_time: the last detection time of the object
+
+            * string obj_class: The class of the object
+
+            * float32 score: the detection score of the object
+
+            * int32 ID: The unique ID of the object
+
+        Output:
+        -------
+        - marker: A marker published for rviz with all the data coming in input.
+        """
         for object in msg.object:
             marker = Marker()
             marker.header.frame_id = "t265_pose_frame"

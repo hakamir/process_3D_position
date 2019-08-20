@@ -1,5 +1,8 @@
 #! /usr/bin/python
 # -*- coding: utf-8 -*-
+"""
+@author: Rodolphe Latour
+"""
 
 from __future__ import print_function
 
@@ -39,9 +42,27 @@ PIXEL_TH = 3
 
 class madnet:
     """
-    Initialize MADNet model with tensorflow and ROS.
+    Description:
+    ============
+    MADNet is a neural network used to provide a disparity map of a given scene.
+    The main input are stereo images (here provided by D435 IR cameras).
+
+    Reference:
+    ----------
+    This is a ROS version of the run script from Real-Time Self-Adaptive
+    Deep-Stereo project.
+    See the GitHub of the original author:
+    https://github.com/CVLAB-Unibo/Real-time-self-adaptive-deep-stereo
+
+    /!\ Warning /!\
+    - this script is only built to run the MAD mode
+    - A few comments have been included within the code. The most comes from the
+    original code
     """
     def __init__(self):
+        """
+        Initialize MADNet model with tensorflow and ROS.
+        """
         # Set network parameters
         parser=argparse.ArgumentParser(description='Script for online Adaptation of a Deep Stereo Network')
         parser.add_argument("-l","--list", help='path to the list file with frames to be processed', default="lists/indoor_02/list.csv")
@@ -237,15 +258,23 @@ class madnet:
         self.reset_counter=0
         self.step=0
 
-    """
-    ROS process. This function perform distance estimation with MADNet working
-    through Tensorflow.
-
-    See the GitHub of the author:
-    https://github.com/CVLAB-Unibo/Real-time-self-adaptive-deep-stereo
-    """
 
     def process(self, msg_l, msg_r):
+        """
+        Description:
+        ============
+        ROS process. This function perform distance estimation with MADNet
+        working through Tensorflow.
+
+        Input:
+        ------
+        - msg_l: the left image from the stereo camera
+        - msg_r: the right image from the stereo camera
+
+        Output:
+        -------
+        - out_img: the disparity map calculated by MADNet (type 32FC1)
+        """
         try:
             # Input image from topic
             img_l = self.bridge.imgmsg_to_cv2(msg_l, "bgr8")
@@ -335,6 +364,8 @@ class madnet:
             if self.args.logDispStep!=-1 and self.step%self.args.logDispStep==0:
                 dispy=fetches[-1]
                 dispy_to_save = np.clip(dispy[0].astype(np.float32), 0, MAX_DISP)
+                # The map is multiply by 255 just to make it visible
+                # It MUST be divided by this value during post processing
                 out_img=dispy_to_save*255
                 self.pub.publish(self.bridge.cv2_to_imgmsg(out_img, "32FC1"))
             self.step+=1

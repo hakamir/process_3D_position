@@ -1,4 +1,8 @@
 #!/usr/bin/python3
+# -*- coding: utf-8 -*-
+"""
+@author: Latour Rodolphe
+"""
 
 import rospy
 import message_filters
@@ -12,29 +16,27 @@ import numpy as np
 from colorama import Fore, Style
 from pyquaternion import Quaternion
 import time
-"""
-@author: Latour Rodolphe
-"""
-"""
-This script is build to filter the points taken from /object/position/meters
-topic. It create areas that have in attributes a name depending the class of
-the detected object, a location, a rotation a scale, a creation time,
-a deadline, and an existence probability.
 
-The goal of an existence area is to classify added points to avoid overfeedings
-of point objects. It means that with recurrence of detection, the program gives
-the ability to create a coercition from previous added point in a specific
-area. Also, from the score of the detection and the recurrence, we can set an
-existence probability that can be used to avoid error of detections.
 
-Program in construction...
-"""
 
 global DECAYING_TIME
-DECAYING_TIME = 120
+DECAYING_TIME = 5
 
 class areaMaker:
+    """
+    Description:
+    ============
+    This script is built to filter the points taken from /object/detected topic. It
+    creates areas that have in attributes a name depending on the class of the
+    detected object, a location, a rotation a scale, a creation time, a deadline,
+    and an existence probability.
 
+    The goal of an existence area is to classify added points to avoid overfeedings
+    of point objects. It means that with recurrence of detection, the program gives
+    the ability to create a coercition from previous added point in a specific
+    area. Also, from the score of the detection and the recurrence, we can set an
+    existence probability that can be used to avoid error of detections.
+    """
     def __init__(self):
 
         print('Initializing node...')
@@ -49,8 +51,24 @@ class areaMaker:
         self.time =time.time()
         rospy.spin()
 
-    def transpose_to_global_quaternion(self, point, cam_point, quaternion):
 
+    def transpose_to_global_quaternion(self, point, cam_point, quaternion):
+        """
+        Description:
+        ============
+        This function is used to transpose the position of the point into global
+        referential based on the tracking camera position.
+
+        Input:
+        ------
+        - point: The position of the point (x,y,z) based on the camera referential
+        - cam_point: The position of the tracking camera T265
+        - quatertion: The rotation of the tracking camera T265
+
+        Output:
+        -------
+        - point: The position of the input point set in global referential
+        """
         point = quaternion.rotate(point)
         point = np.matrix([point[0],point[1],point[2]])
         point = cam_point + point.T
@@ -58,9 +76,50 @@ class areaMaker:
 
     def process(self, pointsMsg, cameraPosMsg):
         """
-        Main function of the class. Perform the job of the script and publish
-        in /object/position/3D topic the whole position of every detected
-        objects. It performs like a light SLAM.
+        Description:
+        ============
+        Main function of the class.
+
+        Input:
+        ------
+        - pointMsg: A list of all detected object. Each element is built
+        that way:
+            * Vector3 position: (x, y, z) position based of camera referential
+
+            * Vector3 scale: 3D box scale (x, y, z) based on the bounding box.
+
+            * string obj_class: The class of the object
+
+            * float32 score: the detection score of the object
+
+        - cameraPosMsg: All the data provided by the Realsense T265 camera.
+        The used data here will be position (x,y,z) in meter and the orientation
+        (w, i, j, k) given in quaternion.
+
+        Output:
+        -------
+        - Objects: A list of object containing specific data.
+            * Vector3 center:
+             -- x: the x position in space (relative to the global position)
+             -- y: the y position in space (relative to the global position)
+             -- z: the z position in space (relative to the global position)
+
+            * Quaternion rotation: The rotation of the object
+
+            * Vector3 scale
+             -- scale_x: the scale in x of the box based on the bounding box
+             -- scale_y: the scale in y of the box based on the bounding box
+             -- scale_z: the scale in z of the box based on the bounding box
+
+            * float64 creation_time: the creation time of the object
+
+            * float64 last_detection_time: the last detection time of the object
+
+            * string obj_class: The class of the object
+
+            * float32 score: the detection score of the object
+
+            * int32 ID: The unique ID of the object
         """
         print("\n__________________________________\n")
         start = time.time()
@@ -89,11 +148,13 @@ class areaMaker:
             cam_rz = cameraPosMsg.pose.pose.orientation.z
             cam_rw = cameraPosMsg.pose.pose.orientation.w
             quaternion = Quaternion(cam_rw, cam_rx, cam_ry, cam_rz)
+            qr = Quaternion(axis=[0,0,1],angle=3.14159265)
+            quaternion = quaternion*qr
 
             # The T265 tracking camera was set looking backward.
             # Then, the X and Z axis are inverted.
-            cam_x = - cam_x
-            cam_z = - cam_z
+            #cam_x = - cam_x
+            #cam_z = - cam_z
             # The rotation might be taken in consideration
             #TODO
             #quaternion.rotate()
@@ -116,6 +177,7 @@ class areaMaker:
             for item in self.obj_list:
                 print(Fore.BLUE + "#-----------Item {}-----------#".format(self.obj_list.index(item)) + Style.RESET_ALL)
                 print("Object center: \n{}".format(item.get_center()))
+                print("camera position: \n{}".format((cam_x,cam_y,cam_z)))
                 print("Object scale: \n{}".format(item.get_scale()))
                 print("Object class: \n{}".format(item.get_class()))
                 print("Object score: \n{}".format(round(item.get_score(),2)))

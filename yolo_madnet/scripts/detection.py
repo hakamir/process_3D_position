@@ -1,5 +1,8 @@
 #! /usr/bin/python
 # -*- coding: utf-8 -*-
+"""
+@author: Rodolphe Latour
+"""
 
 from __future__ import print_function
 
@@ -24,35 +27,51 @@ from yolov3.utils.utils import *
 
 
 
-
 class detection:
     """
-    Initialize Yolov3 model with Pytorch and ROS.
+    Description:
+    ============
+    Yolov3 is a neural network used to make detection of specific objects.
+    The input is a single image (here provided by D435 IR left camera).
+
+    Reference:
+    ----------
+    This is a ROS version of the run script from Ultralytics Yolov3 working on
+    Pytorch tools.
+    See the GitHub of the original author:
+    https://github.com/ultralytics/yolov3
     """
     def __init__(self):
-
+        """
+        Initialize Yolov3 model with Pytorch and ROS.
+        """
         self.load_model()
         self.bridge = CvBridge()
         rospy.init_node('detection_node')
         #sub_l = rospy.Subscriber('/usb_cam/image_raw', Image, self.process, queue_size=10)
-        #sub_l = message_filters.Subscriber('/d435/infra1/image_rect_raw', Image)
-        sub_l = message_filters.Subscriber('/feed/image', Image)
-        ats = message_filters.ApproximateTimeSynchronizer([sub_l], queue_size=1, slop=0.001)
+        sub_l = message_filters.Subscriber('/d435/infra1/image_rect_raw', Image)
+        #sub_l = message_filters.Subscriber('/feed/image', Image)
+        ats = message_filters.ApproximateTimeSynchronizer([sub_l], queue_size=10, slop=0.001)
         ats.registerCallback(self.process)
         #sub_l = rospy.Subscriber('/d435/infra1/image_rect_raw', Image, self.process, queue_size=10)
-        self.pub = rospy.Publisher('/detection/image', DetectionMsg, queue_size=1)
+        self.pub = rospy.Publisher('/detection/image', DetectionMsg, queue_size=10)
         self.start = time.time()
         rospy.spin()
 
-    """
-    ROS process. This function perform object detection with Yolov3 working
-    through Pytorch.
 
-    See the GitHub of the author: https://github.com/ultralytics/yolov3
-    """
     def load_model(self):
+        """
+        Description:
+        ============
+        The models of Yolov3 is loader within this script function. All the
+        self variable of the class are then set for the process method following
+        the main script.
+
+        All the elements present in this function are separated from the process
+        method to avoid loading the model at every images.
+        """
         # Resize from yolo model and set confidence and iou thresholds
-        self.img_size = 608
+        self.img_size = 416
         self.conf_thres = 0.5
         self.nms_thres = 0.5
         # Path to config and weights files
@@ -63,7 +82,7 @@ class detection:
         # For ADAPT dataset
         cfg = 'adapt/yolov3-adapt.cfg'
         #weights = 'adapt/yolov3-adapt_best.weights'
-        weights = '/home/zhaoqi/weights/best.pt'
+        weights = 'adapt/best_8.8.pt'
         class_names = 'adapt/adapt.names'
 
         # Load model and weights
@@ -74,7 +93,13 @@ class detection:
             self.model = Darknet(cfg, s)
         else:
             self.model = Darknet(cfg, self.img_size)
-        _ = load_darknet_weights(self.model, weights)
+        if weights.endswith('.pt'):  # pytorch format
+            if weights.endswith('yolov3.pt') and not os.path.exists(weights):
+                if (platform == 'darwin') or (platform == 'linux'):
+                    os.system('wget https://storage.googleapis.com/ultralytics/yolov3.pt -O ' + weights)
+            self.model.load_state_dict(torch.load(weights, map_location='cpu')['model'])
+        else:  # darknet format
+            _ = load_darknet_weights(self.model, weights)
         # Fuse Conv2d + BatchNorm2d layers
         self.model.fuse()
 
@@ -85,9 +110,34 @@ class detection:
         self.classes = load_classes(class_names)
         self.colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(self.classes))]
 
+
     def process(self, msg):
+        """
+        Description:
+        ============
+        ROS process. This function perform object detection with Yolov3 working
+        through Pytorch.
+
+        Input:
+        ------
+        - msg: the left image from stereo camera
+
+        Output:
+        -------
+        - img: The input original image without modification.
+        - msg_detection: A list of all detected object. Each element is built
+        that way:
+            For bounding box:
+             * x1: the x position for the top left corner
+             * y1: the y position for the top left corner
+             * x2: the x position for the bottom right corner
+             * y2: the y position for the bottom right corner
+
+            * string obj_class: The class of the object
+
+            * float32 score: the detection score of the object
+        """
         # Input image from topic
-        #os.system('clear')
         msg_detection = DetectionMsg()
         try:
             img = self.bridge.imgmsg_to_cv2(msg, "bgr8")
@@ -127,6 +177,7 @@ class detection:
                 msg_bbox.score = score
                 msg_detection.bbox.append(msg_bbox)
                 #plot_one_box(pos, orig_img, label=label, color=self.colors[int(det[item][6])])
+        print(msg_detection)
         print('FPS: {}'.format(int(1 / (time.time() - self.start))))
         self.start = time.time()
         msg_detection.image = self.bridge.cv2_to_imgmsg(orig_img, "rgb8")

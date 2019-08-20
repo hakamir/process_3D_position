@@ -1,3 +1,9 @@
+#! /usr/bin/python
+# -*- coding: utf-8 -*-
+"""
+@author: Rodolphe Latour
+"""
+
 import rospy
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
@@ -9,16 +15,37 @@ import cv2
 import os, sys
 
 
+
 def feed_img():
+    """
+    Description:
+    ============
+    The function publish images on /feed/image topic from a specified directory.
+
+    Input:
+    ------
+    - path: The path of the directory containing the wanted images to be published
+
+    Output:
+    -------
+    - images: The images are published on the topic /feed/images
+
+    /!\ Warning /!\
+    The resize aren't been fully tested and must need few modifications.
+    Use it with caution.
+    """
     parser=argparse.ArgumentParser(description='Feed images from path that will be publish in ros topic /feed/image')
-    parser.add_argument("-p","--path", help='path to the images', default=None)
+    parser.add_argument("-p", "--path", help='path to the images', default=None)
     parser.add_argument("--resize",help='Resize the image',action='store_true')
+    parser.add_argument("-r", "--rate", help='Set the number of images per second', default=15)
+
     args=parser.parse_args()
     rospy.init_node('feed_img_node')
     bridge = CvBridge()
-    pub = rospy.Publisher('/feed/image', Image, queue_size=1)
-    rate = rospy.Rate(15)
-    for img in os.listdir(args.path):
+    pub = rospy.Publisher('/feed/image', Image, queue_size=10)
+    rate = rospy.Rate(args.rate)
+    list = sorted(os.listdir(args.path))
+    for img in list:
         print(os.path.join(args.path,img))
         cv2_img = cv2.imread(os.path.join(args.path,img))
         print('Original image size: {}'.format(cv2_img.shape))
@@ -33,9 +60,6 @@ def feed_img():
         msg_img = bridge.cv2_to_imgmsg(cv2_img, "bgr8")
         pub.publish(msg_img)
         rate.sleep()
-
-
-
 
 if __name__ == '__main__':
     try:

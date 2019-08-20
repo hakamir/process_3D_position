@@ -5,8 +5,22 @@ from yolo_madnet.msg import DetectionMsg
 import cv2
 import os, sys
 
+"""
+@author: Rodolphe Latour
+"""
+
 class create_annotation:
+    """
+    Description:
+    ============
+    This class is used to perform auto-annotation. It works with detection
+    nodes through ROS.
+    It is only built to detect door, handle, elevator and switch classes.
+    """
     def __init__(self):
+        """
+        Initialize ROS subscriber and CvBridge
+        """
         rospy.init_node('create_annotation')
         self.bridge = CvBridge()
         object = rospy.Subscriber('/detection/image', DetectionMsg, self.process, queue_size=10)
@@ -14,15 +28,28 @@ class create_annotation:
         rospy.spin()
 
     def process(self, msg):
-        # This function will create txt files associated to images with yolo format bbox
-        #TODO
+        """
+        Description:
+        ============
+        The process method create text file associated to images and
+        bounding boxes as input.
+
+        Input:
+        ------
+        - msg: A message containing the bounding boxes associated to an image
+
+        Output:
+        -------
+        - text files: It create text files under the yolo format with class
+        indicator (_class) and normalized box center (x, y) and scale (w, h).
+        """
 
         # Convert ros image message to opencv images
         try:
             img = self.bridge.imgmsg_to_cv2(msg.image, "rgb8")
         except CvBridgeError as e:
             print(e)
-        # We perform on every detected objects on the frame
+        # We perform on every detected objects of the frame
         size = img.shape
         img_name = 'img_%08d.jpg'%self.i
         txt_name = 'img_%08d.txt'%self.i
@@ -46,6 +73,21 @@ class create_annotation:
         return
 
     def convert(self,size, box):
+        """
+        Description:
+        ============
+        Used to convert format from (x1, y1, x2, y2) to (x, y, w, h)
+
+        Input:
+        ------
+        - size: The size of the image (width and height)
+        - box: the bounding box data under the format (x1, y1, x2, y2)
+
+        Output:
+        -------
+        - (x, y, w, h): the converted and normalized position of the bounding
+        box under the format used for yolo.
+        """
         dw = 1./size[1]
         dh = 1./size[0]
         x = (box[0] + box[2])/2.0
