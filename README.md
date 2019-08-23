@@ -5,35 +5,50 @@
 
 ## Introduction
 
-For the ADAPT project (http://adapt-project.com/), the ESIGELEC/IRSEEM is working on the detection of various objects to autonomous mobility of a wheel chair. The aim is to give the ability to see the position of every elements detected by cameras thanks to active vision and Deep Learning algorithms to move to needed objects. 
+For the ADAPT project (http://adapt-project.com/), the ESIGELEC/IRSEEM is working on the detection of various objects to autonomous mobility of a wheel chair. The aim is to give the ability to see the position of every elements detected by cameras thanks to active vision and Deep Learning algorithms to move to needed objects.
 
-A usecase is to detect a door (then its handle) to approach the patient to help him to open it. 
+A usecase is to detect a door (then its handle) to approach the patient to help him to open it.
 
 ## Description:
 
-This is a ROS package used to put detected objects thanks to Convolutional Neural Network (Yolov3 in our case) and distance estimator using disparity (Real-time Self-adaptative Deep Stereo of MADNet in our project) into a 3D space. 
+This is a ROS package used to put detected objects thanks to Convolutional Neural Network (Yolov3 in our case) and distance estimator using disparity (Real-time Self-adaptative Deep Stereo of MADNet in our project) into a 3D space.
 
 Here's the ROS architecture :
 
 ![alt text](https://github.com/hakamir/process_3D_position/blob/master/ROS_diagram_2.png)
 
-We use different project from GitHub that are listed below in Ressources.
+We use different projects from GitHub that are listed below in Ressources.
 
 Here's a brief description of each node of the project:
 
-- The *Detection* node works with yolov3 through pytorch and provides bounding box positions (x1, y1, x2, y2 format) with class and score related to. 
+- The *detection* node works with yolov3 through pytorch and provides bounding box positions (x1, y1, x2, y2 format) with class and score related to.
 
 - The *madnet* node works with tensorflow and provide a disparity map used to get the distance of objects.
 
-- The *post_process* node performs a link between bounding boxes and disparity map and convert it into 3D position point. It corrects to position depending the disparity using a mask process. This node is still in construction and another functions to correct distance estimation and box position will be implemented. (histogram correction, Kalman filter...). 
+- The *post_process* node performs a link between bounding boxes and disparity map and convert it into 3D position point. It corrects to position depending the disparity using a mask process. This node is still in construction and another functions to correct distance estimation and box position will be implemented. (histogram correction, Kalman filter...).
 
-- The *areaMaker* node create 3D boxes that represent objects with specific IDs. Every objects added to a box with the same class name might reprensent the same object and it correct it position and existence score. Every objects are placed in a global referential by knowing the position of the camera (T265). 
+- The *areaMaker* node create 3D boxes that represent objects with specific IDs. Every objects added to a box with the same class name might reprensent the same object and it correct it position and existence score. Every objects are placed in a global referential by knowing the position of the camera (T265).
 
-- The *visualizer* node is only used to visualize the position of the 3D boxes with rviz. 
+- The *visualizer* node is only used to visualize the position of the 3D boxes with rviz.
 
 ## Usage:
 
-For now, no usable roslaunch have been created. Run every scripts by hand in different terminal to proceed. 
+The repository is separate in two packages: *yolo_madnet* containing:
+- *detection*
+- *madnet*
+- *post_process*
+
+We can run every nodes with a `roslaunch` command:
+- `roslaunch yolo_madnet yolo_madnet.launch`
+
+and *data_processing* contains:
+- *areaMaker*
+- *visualizer*
+
+Both can be run with:
+- `roslaunch data_processing data_processing.launch`
+
+It is also possible to run each node one by one with this following commands:
 
 - Use Realsense package for D435 and T265 cameras: `roslaunch realsense2_camera rs_d400_and_t_265.launch`
 - Detection : `python yolo_madnet/scripts/detection.py`
@@ -61,10 +76,10 @@ For now, no usable roslaunch have been created. Run every scripts by hand in dif
 `pyquaternion`
 `colorama`
 
-To install all the requirements: 
+To install all the requirements:
 `sudo python -m pip install -r requirement.txt`
 
-Tensorflow is working and was compiled and tested with 1.13.1 GPU version through cuda 10.0 and CuDNN 7.5 with Python 2.7 on Ubuntu 16.04 LTS. 
+Tensorflow is working and was compiled and tested with 1.13.1 GPU version through cuda 10.0 and CuDNN 7.5 with Python 2.7 on Ubuntu 16.04 LTS.
 
 Pytorch works on 1.1.0 version with Python 2.7.
 
@@ -76,10 +91,10 @@ https://drive.google.com/open?id=1iT88gagBGAoxw0BVj_g25YovM_3-SftN
 
 ## Ressources:
 
-### For the object detection: 
+### For the object detection:
 https://github.com/ultralytics/yolov3
 
-### For the distance estimation: 
+### For the distance estimation:
 https://github.com/CVLAB-Unibo/Real-time-self-adaptive-deep-stereo
 
 ### To use D435 and T265 cameras from Intel(R) in ROS:
@@ -89,3 +104,12 @@ https://github.com/IntelRealSense/realsense-ros
 https://github.com/abewley/sort
 
 *Caution : This program has been highly modified to fit to our context, meaning process to 3D positions.*
+
+
+## Issues and works in progress
+
+The *post_process* node isn't good for now. The position of objects in 3D aren't well adjust and a Kalman filter must be added (meaning implementing Sort).
+
+Moreover, MADNet has never been trained in Indoor situation. So the distance estimation might be often wrong.
+
+With the combination of the two points below, a high noise persist when placing the 3D boxes in global environment. So, high works must be done about that subject.
