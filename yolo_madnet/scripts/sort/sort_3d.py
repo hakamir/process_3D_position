@@ -1,3 +1,5 @@
+#! /usr/bin/python3
+# -*- coding: utf-8 -*-
 
 """
     SORT: A Simple, Online and Realtime Tracker
@@ -62,18 +64,18 @@ def iou(bb_test,bb_gt,mesured_distance,predicted_distance):
     + (bb_gt[2]-bb_gt[0])*(bb_gt[3]-bb_gt[1])*2 - whd)
   return(o)
 
-file_dir_path="/media/antoine/Disque dur portable/Detection+Depth/Yolov3_Stereo_depth_multithread/output/Mesure_erreur_GTv3/MAD/estimation_npy/"
-img_dir_path="/media/antoine/Disque dur portable/Datasets/RealSense/python/v2/frames/1/"
+# file_dir_path="/media/antoine/Disque dur portable/Detection+Depth/Yolov3_Stereo_depth_multithread/output/Mesure_erreur_GTv3/MAD/estimation_npy/"
+# img_dir_path="/media/antoine/Disque dur portable/Datasets/RealSense/python/v2/frames/1/"
 
 def get_file_number(file):
     number=os.path.splitext(file)[0]
     return number
 
-file_list=[file_dir_path + file_name for file_name in os.listdir(file_dir_path)]
-file_list=sorted(file_list,key=get_file_number)
-
-img_list=[img_dir_path + file_name for file_name in os.listdir(img_dir_path)]
-img_list=sorted(img_list,key=get_file_number)
+# file_list=[file_dir_path + file_name for file_name in os.listdir(file_dir_path)]
+# file_list=sorted(file_list,key=get_file_number)
+#
+# img_list=[img_dir_path + file_name for file_name in os.listdir(img_dir_path)]
+# img_list=sorted(img_list,key=get_file_number)
 
 def plot_one_box(x, img, color=None, label=None, line_thickness=None):
     # Plots one bounding box on image img
@@ -331,19 +333,6 @@ class Sort(object):
           self.trackers.pop(i)
     output.append((ret,pred,predicted_state,state_x))
     return output
-#    if(len(ret)>0):
-#        if(len(pred)>0):
-#            return np.concatenate(ret),np.concatenate(pred)
-#        else:
-#            return np.concatenate(ret),[]
-#    if(len(pred)>0):
-#        return [],np.concatenate(pred)
-#    return np.empty((0,5)),np.empty((0,5))
-
-
-
-
-
 
 
 def parse_args():

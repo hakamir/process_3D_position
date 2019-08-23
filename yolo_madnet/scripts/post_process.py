@@ -13,8 +13,9 @@ from yolo_madnet.msg import PointsMsg
 from cv_bridge import CvBridge, CvBridgeError
 import argparse
 
-import cv2
-"""
+#import cv2
+
+# If the ROS path cause trouble, uncomment.
 try:
     import cv2
 except ImportError:
@@ -22,14 +23,14 @@ except ImportError:
     sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
     import cv2
     sys.path.append('/opt/ros/kinetic/lib/python2.7/dist-packages')
-"""
+
 import random
 
 import numpy as np
 import time
 
 from sort.utils.object_segmentation import segmentation
-#from sort.sort_3d import Sort
+from sort.sort_3d import Sort
 
 class post_process:
     """
@@ -56,6 +57,8 @@ class post_process:
         self.pixel_size = 3e-6
         self.cell_width = 1280
         self.cell_height = 720
+
+        self.mot_tracker = Sort()
 
         parser=argparse.ArgumentParser(description='Script for post processing object detection and distance estimation.')
         parser.add_argument("-m","--model", help='Paths to the different given dataset (adapt, coco)', default="adapt")
@@ -118,6 +121,11 @@ class post_process:
 
             * float32 score: the detection score of the object
         """
+
+        # initialize variable for sort
+        self.distances = []
+        self.dets = []
+
         points_list = PointsMsg()
         # Convert ROS image message to opencv images
         try:
@@ -132,6 +140,10 @@ class post_process:
             # We set bounding box information in a list 'bbox'
             x1,y1,x2,y2 = object.x1, object.y1, object.x2, object.y2
             bbox = [x1, y1, x2, y2]
+            # We get the size of the provided image (it must me resized)
+            self.img_width = img.shape[1]
+            self.img_height = img.shape[0]
+
             # We take a mask of the object from the disparity to improve results
             # The mask is usefull to avoid taking account of background
             #mask, img = segmentation(bbox, disparity, img)
@@ -141,9 +153,32 @@ class post_process:
             #distance = self.disp_mask(mask[0][0], disparity, bbox)
             distance = self.median_calculation(disparity, bbox)
 
-            # We get the size of the provided image (it must me resized)
-            self.img_width = img.shape[1]
-            self.img_height = img.shape[0]
+            # Performing tracking with SORT
+            tmp = bbox
+            tmp.append(object.score)
+            # Append data to track
+            self.dets.append(tmp)
+            self.distances.append(distance)
+
+            # Perform tracking
+            trackers,predictions,predicted_state,state_x = np.array(self.mot_tracker.update(np.array(self.dets),np.array(self.distances))[0])
+
+            # concatenate every previous results
+            if len(trackers)>0:
+                trackers=np.concatenate(trackers)
+            if len(predicted_state)>0:
+                predicted_state=np.concatenate(predicted_state)
+            if len(predictions)>0:
+                predictions=np.concatenate(predictions)
+            if len(state_x)>0:
+                state_x=np.concatenate(state_x)
+
+            try:
+                print(trackers[0])
+                bbox = trackers[1]
+                x1, y1, x2, y2, ID = bbox[0], bbox[1], bbox[2], bbox[3], bbox[4]
+            except:
+                continue
 
             # We define the position of the object on the image at the center of the box
             u = (x2 - x1) / 2 + x1 - self.img_width/2
@@ -185,12 +220,14 @@ class post_process:
             point.obj_class = _class
             point.score = score
             # Then add each message to a list (one message per object)
-            rospy.loginfo('OBJECT: {}\n SCORE: {}\n POSITION:{},{},{}'.format(
+            """
+            rospy.loginfo('OBJECT: {}\n SCORE: {}\n POSITION:({}, {}, {})'.format(
                     point.obj_class,
                     point.score,
-                    point.scale.x,
-                    point.scale.y,
-                    point.scale.z))
+                    X,
+                    point.position.y,
+                    point.position.z))
+            """
             points_list.point.append(point)
 
             # Plot box to the image for visualisation
@@ -297,11 +334,11 @@ class post_process:
         disp_seg = np.ma.masked_array(disp_seg, mask=mask)
         median = np.median(disp_seg.data)
         # We now calculate the distance in meter with the following equation:
-        # distance = resize * (focal * baseline)/(pixel_size * disparity)
+        # distance = resize * (focal * baseline)/(pixel_size * disparity)+
         if median==0:
-            median= ((self.img_width/self.cell_width) * focal_lenght * baseline) / (pixel_size*(median + 0.001))
+            median = ((float(self.img_width)/float(self.cell_width)) * focal_lenght * baseline) / (pixel_size*(median + 0.001))
         else:
-            median= ((self.img_width/self.cell_width) * focal_lenght * baseline) / (pixel_size*median)
+            median = ((float(self.img_width)/float(self.cell_width)) * focal_lenght * baseline) / (pixel_size*median)
         return median
 
 
@@ -334,9 +371,9 @@ class post_process:
         # We now calculate the distance in meter with the following equation:
         # distance = resize * (focal * baseline)/(pixel_size * disparity)
         if median==0:
-            median= ((self.img_width/self.cell_width) * focal_lenght * baseline) / (pixel_size*(median + 0.001))
+            median = ((float(self.img_width)/float(self.cell_width)) * focal_lenght * baseline) / (pixel_size*(median + 0.001))
         else:
-            median= (((self.img_width/self.cell_width) * focal_lenght * baseline) / (pixel_size*median)
+            median = ((float(self.img_width)/float(self.cell_width)) * focal_lenght * baseline) / (pixel_size*median)
         return median
 
 
@@ -349,8 +386,9 @@ class post_process:
 
         Description:
         ============
-        The method gives the distance of the center of the bounding box. Most usefull
-        for plane object but doesn't take in account object in front of it.
+        The method gives the distance of the center of the bounding box after
+        the mask application. Most usefull for plane object but doesn't take in
+        account object in front of it.
 
         Input:
         ------
@@ -363,8 +401,9 @@ class post_process:
 
         Output:
         -------
-        - distance: The distance in meter of the object in the center of the box based
-        of the histogram of the disparity value in 9/10 of the size of the bounding box
+        - distance: The distance in meter of the object in the center of the box
+        based of the histogram of the disparity value in 9/10 of the size of the
+        bounding box.
         """
         x1, y1, x2, y2 = bbox
         hist_with_indx=np.zeros((65536,2))
