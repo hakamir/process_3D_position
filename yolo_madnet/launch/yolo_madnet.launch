@@ -1,5 +1,5 @@
 <launch>
-  <!--node pkg="yolo_madnet" name="post_process_node" type="post_process.py" output="screen"/-->
-  <!--node pkg="yolo_madnet" name="detection_node" type="detection.py" output="screen"/-->
-  <!--node pkg="yolo_madnet" name="madnet_node" type="madnet.py" output="screen"/-->
+  <node pkg="yolo_madnet" name="post_process_node" type="post_process.py" cwd="node" output="screen"/>
+  <node pkg="yolo_madnet" name="detection_node" type="detection.py" cwd="node" output="screen"/>
+  <node pkg="yolo_madnet" name="madnet_node" type="madnet.py" cwd="node" output="screen"/>
 </launch>

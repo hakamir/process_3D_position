@@ -1,4 +1,0 @@
-<launch>
-  <!--node pkg="data_processing" name="spacialize_node" type="spacialize.py" output="screen" /-->
-  <node pkg="data_processing" name="areamaker_node" type="areaMaker.py" output="screen" />
-</launch>

@@ -1,0 +1,4 @@
+<launch>
+  <node pkg="data_processing" name="areamaker_node" type="areaMaker.py" cwd="node" output="screen" />
+  <node pkg="data_processing" name="visualizer_node" type="visualizer.py" cwd="node" output="screen" />
+</launch>
