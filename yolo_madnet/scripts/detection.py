@@ -12,6 +12,7 @@ from sensor_msgs.msg import Image
 from yolo_madnet.msg import BboxMsg
 from yolo_madnet.msg import DetectionMsg
 from cv_bridge import CvBridge, CvBridgeError
+import argparse
 
 import time
 
@@ -45,6 +46,10 @@ class detection:
         """
         Initialize Yolov3 model with Pytorch and ROS.
         """
+        parser=argparse.ArgumentParser(description='Script for yolov3 under ROS object detection program')
+        parser.add_argument("-m","--model", help='Paths to the different given dataset (adapt, coco)', default="adapt")
+        self.args=parser.parse_args(rospy.myargv()[1:])
+
         self.load_model()
         self.bridge = CvBridge()
         rospy.init_node('detection_node')
@@ -74,16 +79,20 @@ class detection:
         self.img_size = 416
         self.conf_thres = 0.5
         self.nms_thres = 0.5
+
         # Path to config and weights files
         # For yolov3 spp
-        #cfg = 'yolov3/cfg/yolov3-spp.cfg'
-        #weights = 'yolov3/weights/yolov3-spp.weights'
-        #class_names = 'yolov3/data/coco.names'
+        if self.args.model == 'coco':
+            cfg = 'yolov3/cfg/yolov3-spp.cfg'
+            weights = 'yolov3/weights/yolov3-spp.weights'
+            class_names = 'yolov3/data/coco.names'
         # For ADAPT dataset
-        cfg = 'adapt/yolov3-adapt.cfg'
-        #weights = 'adapt/yolov3-adapt_best.weights'
-        weights = 'adapt/best_8.8.pt'
-        class_names = 'adapt/adapt.names'
+        elif self.args.model == 'adapt':
+            cfg = 'adapt/yolov3-adapt.cfg'
+            weights = 'adapt/best_8.8.pt'
+            class_names = 'adapt/adapt.names'
+        else:
+            raise NameError("Error! Cannot find '{}' dataset.".format(self.args.model))
 
         # Load model and weights
         print('Loading models...')
@@ -162,23 +171,24 @@ class detection:
             # Rescale boxes from 416 to true image size
             det[:, :4] = scale_coords(img.shape[2:], det[:, :4], orig_img.shape[:2]).round()
             for item in range(len(det)):
+                # Get the name of the detected object
                 label = '%s' % (self.classes[int(det[item][6].unique())])
+                # Get the detection score
                 score = det[item][4].tolist()
+                # Get the bounding box position
                 pos = det[item][0:4].tolist()
-                for i in range(len(pos)):
-                    pos[i] = int(pos[i])
-                x1, y1, x2, y2 = pos
                 msg_bbox = BboxMsg()
-                msg_bbox.x1 = x1
-                msg_bbox.y1 = y1
-                msg_bbox.x2 = x2
-                msg_bbox.y2 = y2
+                # Create the message for one object
+                msg_bbox.x1 = int(pos[0])
+                msg_bbox.y1 = int(pos[1])
+                msg_bbox.x2 = int(pos[2])
+                msg_bbox.y2 = int(pos[3])
                 msg_bbox.obj_class = label
                 msg_bbox.score = score
+                # Add the message to a list of all objects on the frame
                 msg_detection.bbox.append(msg_bbox)
-                #plot_one_box(pos, orig_img, label=label, color=self.colors[int(det[item][6])])
-        print(msg_detection)
-        print('FPS: {}'.format(int(1 / (time.time() - self.start))))
+
+        rospy.loginfo('DETECTION FPS: {}'.format(int(1 / (time.time() - self.start))))
         self.start = time.time()
         msg_detection.image = self.bridge.cv2_to_imgmsg(orig_img, "rgb8")
         self.pub.publish(msg_detection)

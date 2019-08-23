@@ -82,7 +82,7 @@ class madnet:
         parser.add_argument("--sampleFrequency",help="sample new network portions to train every K frame",type=int,default=1)
         parser.add_argument("--mode",help="online adaptation mode: NONE - perform only inference, FULL - full online backprop, MAD - backprop only on portions of the network", choices=['NONE','FULL','MAD'], default='MAD')
         parser.add_argument("--logDispStep", help="save disparity every K step, -1 to disable", default=1, type=int)
-        self.args=parser.parse_args()
+        self.args=parser.parse_args(rospy.myargv()[1:])
 
         # Load MADNet
         self.load_model(self.args)
@@ -369,7 +369,7 @@ class madnet:
                 out_img=dispy_to_save*255
                 self.pub.publish(self.bridge.cv2_to_imgmsg(out_img, "32FC1"))
             self.step+=1
-            print('FPS: {}'.format(int(1 / (time.time() - self.start))))
+            rospy.loginfo('MADNET FPS: {}'.format(int(1 / (time.time() - self.start))))
             self.start = time.time()
         except tf.errors.OutOfRangeError:
         	pass

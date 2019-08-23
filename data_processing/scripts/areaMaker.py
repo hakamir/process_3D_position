@@ -8,7 +8,7 @@ import rospy
 import message_filters
 from data_processing.msg import ObjectMsg
 from data_processing.msg import ObjectsMsg
-from data_processing.msg import PointsMsg
+from yolo_madnet.msg import PointsMsg
 from nav_msgs.msg import Odometry
 
 from object_creator import object_creator

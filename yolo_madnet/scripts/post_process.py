@@ -8,9 +8,10 @@ import rospy
 import message_filters
 from sensor_msgs.msg import Image
 from yolo_madnet.msg import DetectionMsg
-from data_processing.msg import PointMsg
-from data_processing.msg import PointsMsg
+from yolo_madnet.msg import PointMsg
+from yolo_madnet.msg import PointsMsg
 from cv_bridge import CvBridge, CvBridgeError
+import argparse
 
 import cv2
 """
@@ -53,9 +54,17 @@ class post_process:
         self.baseline = 49.867050e-3
         self.focal = 1.93e-3
         self.pixel_size = 3e-6
-
+        parser=argparse.ArgumentParser(description='Script for post processing object detection and distance estimation.')
+        parser.add_argument("-m","--model", help='Paths to the different given dataset (adapt, coco)', default="adapt")
+        args=parser.parse_args(rospy.myargv()[1:])
         # Loading class names file and generate random colors for bounding boxes
-        self.classes = self.load_classes('adapt/adapt.names')
+        if args.model == 'adapt':
+            self.class_file_path = 'adapt/adapt.names' # Door, handle, elevator and switch
+        elif args.model == 'coco':
+            self.class_file_path = 'yolov3/data/coco.names' # COCO dataset classes
+        else:
+            raise NameError("'{}' file is not accessible in the script.".format(self.class_file_path))
+        self.classes = self.load_classes(self.class_file_path)
         self.colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(self.classes))]
         self.bridge = CvBridge()
 
@@ -70,7 +79,6 @@ class post_process:
         self.pub = rospy.Publisher('/object/detected', PointsMsg, queue_size=0)
         self.pub_img = rospy.Publisher('/detection/distance', Image, queue_size=0)
         rospy.spin()
-
 
     def process(self, disp, obj):
         """
@@ -106,7 +114,7 @@ class post_process:
             * float32 score: the detection score of the object
         """
         points_list = PointsMsg()
-        # Convert ros image message to opencv images
+        # Convert ROS image message to opencv images
         try:
             # For the disparity, the type is 32FC1
             disparity = self.bridge.imgmsg_to_cv2(disp, "32FC1")
@@ -116,19 +124,18 @@ class post_process:
             print(e)
         # We perform on every detected objects on the frame
         for object in obj.bbox:
+            # We set bounding box information in a list 'bbox'
             x1,y1,x2,y2 = object.x1, object.y1, object.x2, object.y2
             bbox = [x1, y1, x2, y2]
             # We take a mask of the object from the disparity to improve results
+            # The mask is usefull to avoid taking account of background
             mask, img = segmentation(bbox, disparity, img)
 
             # We get the distance in meter
             # It correspond to the direct distance from the focal point, not z
             distance = self.disp_mask(mask[0][0], disparity, bbox)
-            #distance = self.get_object_distance(mask, disparity, bbox,
-            #            focal_lenght=1.93, baseline=49.867050, pixel_size=3)
 
             # We define the position of the object on the image at the center of the box
-            #distance = ((2.0/3.0)*self.focal*self.baseline)/(self.pixel_size*disparity[(x2 - x1)/2][(y2 - y1)/2]/255)
             u = (x2 - x1) / 2 + x1 - img.shape[1]/2
             v = (y2 - y1) / 2 + y1 - img.shape[0]/2
 
@@ -139,7 +146,7 @@ class post_process:
             Y = distance * self.pixel_size * v * factor
             Z = distance * self.focal * factor
 
-            # Calculate the scale of the bounding box that will be transposed in 3D
+            # Calculate the scale of the 3D 'bounding' box
             x_1 = u - (x2 - x1) / 2
             x_2 = u + (x2 - x1) / 2
             y_1 = v - (y2 - y1) / 2
@@ -147,14 +154,16 @@ class post_process:
             factor = np.sqrt(1/(self.focal**2 + self.pixel_size**2 * (x_2 - x_1)**2 + self.pixel_size**2 * (y_2 - y_1)**2))
             a = distance * self.pixel_size * (x_2 - x_1) * factor
             b = distance * self.pixel_size * (y_2 - y_1) * factor
+            # We arbitrary say that the depth of the box (z) is equal to the root of a*b
             c = np.sqrt(a*b)
             scale = [a, b, c]
 
-            # Now append data to the message
+            # Preparing stamptime for header and message object
             _class = object.obj_class
             score = object.score
             now = rospy.get_rostime()
             point = PointMsg()
+            # Now append data to the new message
             point.header.stamp.secs = now.secs
             point.header.stamp.nsecs = now.nsecs
             point.position.x = X
@@ -165,14 +174,20 @@ class post_process:
             point.scale.z = scale[2]
             point.obj_class = _class
             point.score = score
+            # Then add each message to a list (one message per object)
+            rospy.loginfo('OBJECT: {}\n SCORE: {}\n POSITION:{},{},{}'.format(
+                    point.obj_class,
+                    point.score,
+                    point.scale.x,
+                    point.scale.y,
+                    point.scale.z))
             points_list.point.append(point)
 
             # Plot box to the image for visualisation
             label = _class + " " + str(round(distance,2)) + ' m'
-            for cls in self.classes:
-                # Check for the corresponding class in the list to get the index
-                if _class == cls:
-                    color_index = self.classes.index(cls)
+            # We set a color depending the index of the class in the list
+            color_index = self.classes.index(_class)
+            # Then, we plot a box on the raw image. One by detected object.
             self.plot_one_box(bbox, img, label=label, color=self.colors[color_index])
 
         # Publish the visualisation of bounding box with distance and mask
@@ -182,14 +197,26 @@ class post_process:
         points_list.header.stamp.secs = now.secs
         points_list.header.stamp.nsecs = now.nsecs
         self.pub.publish(points_list)
-        print(points_list)
 
     def load_classes(self, path):
+        """
+        Description:
+        ============
+        A function to load all the classes attributed to a trained model that
+        are accessible in a list. The method take care to remove empty strings.
+        The files to load end with '*.names'.
+
+        Input:
+        ------
+        - path: The path of the text file containing the classes (one by line)
+
+        Output:
+        - list: A list containing for each element a class from the model
+        """
         # Loads *.names file at 'path'
         with open(path, 'r') as f:
             names = f.read().split('\n')
         return list(filter(None, names))  # filter removes empty strings (such as last line)
-
 
     def plot_one_box(self, x, img, color=None, label=None, line_thickness=None):
         """
@@ -222,7 +249,6 @@ class post_process:
             else:
                 cv2.rectangle(img, (c1[0], c1[1] + 30), (c2[0], c2[1] - 2 + 30), color, -1)  # filled
                 cv2.putText(img, label, (c1[0], c1[1] - 2 + 30), 0, tl / 3, [225, 255, 255], thickness=int(tf), lineType=cv2.LINE_AA)
-
 
     def disp_mask(self, mask, disp, bbox, focal_lenght=1.93e-3, baseline=49.867050e-3, pixel_size=3e-6):
         """

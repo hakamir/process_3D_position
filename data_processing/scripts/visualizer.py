@@ -18,7 +18,7 @@ class visualizer:
     position, the rotation and the scale of the object.
     """
     def __init__(self):
-        rospy.init_node('visualizer')
+        rospy.init_node('visualizer_node')
         rospy.Subscriber('/object/position/3D', ObjectsMsg, self.process, queue_size=10)
         self.pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
         self.classes = self.load_classes('../../yolo_madnet/scripts/adapt/adapt.names')
@@ -40,17 +40,11 @@ class visualizer:
         Input:
         ------
         - Objects: A list of object containing specific data.
-            * Vector3 center:
-             -- x: the x position in space (relative to the global position)
-             -- y: the y position in space (relative to the global position)
-             -- z: the z position in space (relative to the global position)
+            * Vector3 center: (x, y, z) position in global referential
 
             * Quaternion rotation: The rotation of the object
 
-            * Vector3 scale
-             -- scale_x: the scale in x of the box based on the bounding box
-             -- scale_y: the scale in y of the box based on the bounding box
-             -- scale_z: the scale in z of the box based on the bounding box
+            * Vector3 scale: (x, y, z) scale of box based on the bounding box
 
             * float64 creation_time: the creation time of the object
 
