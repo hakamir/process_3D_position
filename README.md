@@ -15,7 +15,7 @@ This is a ROS package used to put detected objects thanks to Convolutional Neura
 
 Here's the ROS architecture :
 
-![alt text](https://github.com/hakamir/process_3D_position/blob/master/ROS_diagram_2.png)
+![alt text](https://github.com/hakamir/process_3D_position/blob/master/ROS_diagram.png)
 
 We use different projects from GitHub that are listed below in Ressources.
 
