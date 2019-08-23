@@ -54,6 +54,9 @@ class post_process:
         self.baseline = 49.867050e-3
         self.focal = 1.93e-3
         self.pixel_size = 3e-6
+        self.cell_width = 1280
+        self.cell_height = 720
+
         parser=argparse.ArgumentParser(description='Script for post processing object detection and distance estimation.')
         parser.add_argument("-m","--model", help='Paths to the different given dataset (adapt, coco)', default="adapt")
         args=parser.parse_args(rospy.myargv()[1:])
@@ -79,6 +82,8 @@ class post_process:
         self.pub = rospy.Publisher('/object/detected', PointsMsg, queue_size=0)
         self.pub_img = rospy.Publisher('/detection/distance', Image, queue_size=0)
         rospy.spin()
+
+
 
     def process(self, disp, obj):
         """
@@ -129,15 +134,20 @@ class post_process:
             bbox = [x1, y1, x2, y2]
             # We take a mask of the object from the disparity to improve results
             # The mask is usefull to avoid taking account of background
-            mask, img = segmentation(bbox, disparity, img)
+            #mask, img = segmentation(bbox, disparity, img)
 
             # We get the distance in meter
             # It correspond to the direct distance from the focal point, not z
-            distance = self.disp_mask(mask[0][0], disparity, bbox)
+            #distance = self.disp_mask(mask[0][0], disparity, bbox)
+            distance = self.median_calculation(disparity, bbox)
+
+            # We get the size of the provided image (it must me resized)
+            self.img_width = img.shape[1]
+            self.img_height = img.shape[0]
 
             # We define the position of the object on the image at the center of the box
-            u = (x2 - x1) / 2 + x1 - img.shape[1]/2
-            v = (y2 - y1) / 2 + y1 - img.shape[0]/2
+            u = (x2 - x1) / 2 + x1 - self.img_width/2
+            v = (y2 - y1) / 2 + y1 - self.img_height/2
 
             # We found (x,y,z) object positions from camera referential
             # through those equations.
@@ -198,6 +208,8 @@ class post_process:
         points_list.header.stamp.nsecs = now.nsecs
         self.pub.publish(points_list)
 
+
+
     def load_classes(self, path):
         """
         Description:
@@ -217,6 +229,8 @@ class post_process:
         with open(path, 'r') as f:
             names = f.read().split('\n')
         return list(filter(None, names))  # filter removes empty strings (such as last line)
+
+
 
     def plot_one_box(self, x, img, color=None, label=None, line_thickness=None):
         """
@@ -250,8 +264,13 @@ class post_process:
                 cv2.rectangle(img, (c1[0], c1[1] + 30), (c2[0], c2[1] - 2 + 30), color, -1)  # filled
                 cv2.putText(img, label, (c1[0], c1[1] - 2 + 30), 0, tl / 3, [225, 255, 255], thickness=int(tf), lineType=cv2.LINE_AA)
 
+
+
     def disp_mask(self, mask, disp, bbox, focal_lenght=1.93e-3, baseline=49.867050e-3, pixel_size=3e-6):
         """
+        DEPRECATED
+        --> The median calculation doesn't take care of the mask
+
         Description:
         ============
         This function search the median point of the disparity map from the masked
@@ -277,12 +296,49 @@ class post_process:
         # We keep only the disparity values of the bounding box that aren't masked
         disp_seg = np.ma.masked_array(disp_seg, mask=mask)
         median = np.median(disp_seg.data)
-        # We now calculate the distance in meter
+        # We now calculate the distance in meter with the following equation:
+        # distance = resize * (focal * baseline)/(pixel_size * disparity)
         if median==0:
-            median= ((2.0/3.0) * focal_lenght * baseline) / (pixel_size*(median + 0.001))
+            median= ((self.img_width/self.cell_width) * focal_lenght * baseline) / (pixel_size*(median + 0.001))
         else:
-            median= ((2.0/3.0) * focal_lenght * baseline) / (pixel_size*median)
+            median= ((self.img_width/self.cell_width) * focal_lenght * baseline) / (pixel_size*median)
         return median
+
+
+
+    def median_calculation(self, disp, bbox, focal_lenght=1.93e-3, baseline=49.867050e-3, pixel_size=3e-6):
+        """
+        Description:
+        ============
+        This function search the median point of the disparity map without
+        using the mask method. It returns the distance in meter.
+
+        Input:
+        ------
+        - disp: The disparity map
+        - bbox: The bounding box position of the detected objects
+        - focal_lenght: The focal lenght of the used camera (default:1.93e-3)
+        - baseline: The baseline of the setup used (default:49.867050e-3)
+        - pixel_size: The size of a pixel in the cell of the used camera (default:3e-6)
+
+        Output:
+        -------
+        - median: The distance in meter of the object based on the median of each
+        disparity value.
+        """
+        x1, y1, x2, y2 = bbox
+        # We crop the disparity map image to the bounding box position
+        disp_seg=disp[y1:y2,x1:x2]/255
+        # We calculate the median of the disparity points
+        median = np.median(disp_seg)
+        # We now calculate the distance in meter with the following equation:
+        # distance = resize * (focal * baseline)/(pixel_size * disparity)
+        if median==0:
+            median= ((self.img_width/self.cell_width) * focal_lenght * baseline) / (pixel_size*(median + 0.001))
+        else:
+            median= (((self.img_width/self.cell_width) * focal_lenght * baseline) / (pixel_size*median)
+        return median
+
 
 
     def get_object_distance(self, mask, disp, bbox, focal_lenght=1.93e-3, baseline=49.867050e-3, pixel_size=3e-6):
