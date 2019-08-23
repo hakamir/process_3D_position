@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  visualization_msgs
   message_generation
   geometry_msgs
 )
@@ -19,8 +20,6 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   CameraMsg.msg
-  PointMsg.msg
-  PointsMsg.msg
   ObjectMsg.msg
   ObjectsMsg.msg
 )
@@ -32,6 +31,7 @@ add_message_files(
    std_msgs  # Or other packages containing msgs
  )
 
+catkin_package()
 
 include_directories(
 # include
