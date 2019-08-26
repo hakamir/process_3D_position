@@ -70,8 +70,8 @@ class post_process:
             self.class_file_path = 'yolov3/data/coco.names' # COCO dataset classes
         else:
             raise NameError("'{}' file is not accessible in the script.".format(self.class_file_path))
-        self.classes = self.load_classes(self.class_file_path)
-        self.colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(self.classes))]
+        self.all_classes = self.load_classes(self.class_file_path)
+        self.colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(self.all_classes))]
         self.bridge = CvBridge()
 
         # Init ROS node, publishers and subscribers
@@ -92,8 +92,11 @@ class post_process:
         """
         Description:
         ============
-        This is the function run everytime the three messages in input are
+        This is the function run everytime the two messages in input are
         received. It manages all the process to provide the asked output topics.
+        It uses Sort (Simple, online and realtime tracking) to track objects
+        and avoid detection noises. It can also provide position prediction
+        (unused here but available).
 
         Input:
         ------
@@ -104,7 +107,9 @@ class post_process:
         Output:
         -------
         - img: The images with the detected objects surrounded with bounding
-        boxes and a label with the class name and the relative distance.
+        boxes and a label with the class name and the relative distance. The
+        bounding box are different from the entry because of the tracking
+        calculation that correct the position estimation with a Kalman filter.
         - points_list: A list of all detected object. Each element is built
         that way:
             * Vector3 position
@@ -139,7 +144,12 @@ class post_process:
         for object in obj.bbox:
             # We set bounding box information in a list 'bbox'
             x1,y1,x2,y2 = object.x1, object.y1, object.x2, object.y2
-            bbox = [x1, y1, x2, y2]
+            _class = object.obj_class
+            score = object.score
+            # To be able to manage class information in Sort, we provide a
+            # class ID that will be instanciate for the tracker
+            cls_id = self.all_classes.index(_class)
+            obj = [x1, y1, x2, y2, score, cls_id]
             # We get the size of the provided image (it must me resized)
             self.img_width = img.shape[1]
             self.img_height = img.shape[0]
@@ -151,17 +161,16 @@ class post_process:
             # We get the distance in meter
             # It correspond to the direct distance from the focal point, not z
             #distance = self.disp_mask(mask[0][0], disparity, bbox)
-            distance = self.median_calculation(disparity, bbox)
+            distance = self.median_calculation(disparity, obj[:4])
 
-            # Performing tracking with SORT
-            tmp = bbox
-            tmp.append(object.score)
+
+            ### Performing tracking with SORT ###
             # Append data to track
-            self.dets.append(tmp)
+            self.dets.append(obj)
             self.distances.append(distance)
-
             # Perform tracking
             trackers,predictions,predicted_state,state_x = np.array(self.mot_tracker.update(np.array(self.dets),np.array(self.distances))[0])
+            # Trackers provides the objects tracked position
 
             # concatenate every previous results
             if len(trackers)>0:
@@ -173,69 +182,70 @@ class post_process:
             if len(state_x)>0:
                 state_x=np.concatenate(state_x)
 
-            try:
-                print(trackers[0])
-                bbox = trackers[1]
+        # We perform on every tracked objects
+        try:
+            for bbox in trackers:
+                distance = self.median_calculation(disparity, bbox[:4].astype(int))
                 x1, y1, x2, y2, ID = bbox[0], bbox[1], bbox[2], bbox[3], bbox[4]
-            except:
-                continue
+                # We define the position of the object on the image at the center of the box
+                u = (x2 - x1) / 2 + x1 - self.img_width/2
+                v = (y2 - y1) / 2 + y1 - self.img_height/2
 
-            # We define the position of the object on the image at the center of the box
-            u = (x2 - x1) / 2 + x1 - self.img_width/2
-            v = (y2 - y1) / 2 + y1 - self.img_height/2
+                # We found (x,y,z) object positions from camera referential
+                # through those equations.
+                factor = np.sqrt(1/(self.focal**2 + self.pixel_size**2 * u**2 + self.pixel_size**2 * v**2))
+                X = distance * self.pixel_size * u * factor
+                Y = distance * self.pixel_size * v * factor
+                Z = distance * self.focal * factor
 
-            # We found (x,y,z) object positions from camera referential
-            # through those equations.
-            factor = np.sqrt(1/(self.focal**2 + self.pixel_size**2 * u**2 + self.pixel_size**2 * v**2))
-            X = distance * self.pixel_size * u * factor
-            Y = distance * self.pixel_size * v * factor
-            Z = distance * self.focal * factor
+                # Calculate the scale of the 3D 'bounding' box
+                x_1 = u - (x2 - x1) / 2
+                x_2 = u + (x2 - x1) / 2
+                y_1 = v - (y2 - y1) / 2
+                y_2 = v + (y2 - y1) / 2
+                factor = np.sqrt(1/(self.focal**2 + self.pixel_size**2 * (x_2 - x_1)**2 + self.pixel_size**2 * (y_2 - y_1)**2))
+                a = distance * self.pixel_size * (x_2 - x_1) * factor
+                b = distance * self.pixel_size * (y_2 - y_1) * factor
+                # We arbitrary say that the depth of the box (z) is equal to the root of a*b
+                c = np.sqrt(a*b)
+                scale = [a, b, c]
 
-            # Calculate the scale of the 3D 'bounding' box
-            x_1 = u - (x2 - x1) / 2
-            x_2 = u + (x2 - x1) / 2
-            y_1 = v - (y2 - y1) / 2
-            y_2 = v + (y2 - y1) / 2
-            factor = np.sqrt(1/(self.focal**2 + self.pixel_size**2 * (x_2 - x_1)**2 + self.pixel_size**2 * (y_2 - y_1)**2))
-            a = distance * self.pixel_size * (x_2 - x_1) * factor
-            b = distance * self.pixel_size * (y_2 - y_1) * factor
-            # We arbitrary say that the depth of the box (z) is equal to the root of a*b
-            c = np.sqrt(a*b)
-            scale = [a, b, c]
+                # Preparing stamptime for header and message object
+                _class = self.all_classes[int(bbox[-1])]
+                score = bbox[-2]
+                now = rospy.get_rostime()
+                point = PointMsg()
+                # Now append data to the new message
+                point.header.stamp.secs = now.secs
+                point.header.stamp.nsecs = now.nsecs
+                point.position.x = X
+                point.position.y = Y
+                point.position.z = Z
+                point.scale.x = scale[0]
+                point.scale.y = scale[1]
+                point.scale.z = scale[2]
+                point.obj_class = _class
+                point.score = score
+                # Then add each message to a list (one message per object)
+                """
+                rospy.loginfo('OBJECT: {}\n SCORE: {}\n POSITION:({}, {}, {})'.format(
+                        point.obj_class,
+                        point.score,
+                        X,
+                        point.position.y,
+                        point.position.z))
+                """
+                points_list.point.append(point)
 
-            # Preparing stamptime for header and message object
-            _class = object.obj_class
-            score = object.score
-            now = rospy.get_rostime()
-            point = PointMsg()
-            # Now append data to the new message
-            point.header.stamp.secs = now.secs
-            point.header.stamp.nsecs = now.nsecs
-            point.position.x = X
-            point.position.y = Y
-            point.position.z = Z
-            point.scale.x = scale[0]
-            point.scale.y = scale[1]
-            point.scale.z = scale[2]
-            point.obj_class = _class
-            point.score = score
-            # Then add each message to a list (one message per object)
-            """
-            rospy.loginfo('OBJECT: {}\n SCORE: {}\n POSITION:({}, {}, {})'.format(
-                    point.obj_class,
-                    point.score,
-                    X,
-                    point.position.y,
-                    point.position.z))
-            """
-            points_list.point.append(point)
+                # Plot box to the image for visualisation
+                label = self.all_classes[int(bbox[-1])] + " " + str(int(ID)) + " " + str(round(distance,2)) + ' m'
+                # We set a color depending the index of the class
+                color_index = int(bbox[-1])
+                # Then, we plot a box on the raw image. One by detected object.
+                self.plot_one_box(bbox, img, label=label, color=self.colors[color_index])
 
-            # Plot box to the image for visualisation
-            label = _class + " " + str(round(distance,2)) + ' m'
-            # We set a color depending the index of the class in the list
-            color_index = self.classes.index(_class)
-            # Then, we plot a box on the raw image. One by detected object.
-            self.plot_one_box(bbox, img, label=label, color=self.colors[color_index])
+        except UnboundLocalError:
+            pass
 
         # Publish the visualisation of bounding box with distance and mask
         self.pub_img.publish(self.bridge.cv2_to_imgmsg(img, "rgb8"))
