@@ -312,6 +312,41 @@ class post_process:
                 cv2.putText(img, label, (c1[0], c1[1] - 2 + 30), 0, tl / 3, [225, 255, 255], thickness=int(tf), lineType=cv2.LINE_AA)
 
 
+    def median_calculation(self, disp, bbox, focal_lenght=1.93e-3, baseline=49.867050e-3, pixel_size=3e-6):
+        """
+        Description:
+        ============
+        This function search the median point of the disparity map without
+        using the mask method. It returns the distance in meter.
+
+        Input:
+        ------
+        - disp: The disparity map
+        - bbox: The bounding box position of the detected objects
+        - focal_lenght: The focal lenght of the used camera (default:1.93e-3)
+        - baseline: The baseline of the setup used (default:49.867050e-3)
+        - pixel_size: The size of a pixel in the cell of the used camera (default:3e-6)
+
+        Output:
+        -------
+        - median: The distance in meter of the object based on the median of each
+        disparity value.
+        """
+        x1, y1, x2, y2 = bbox
+        # We crop the disparity map image to the bounding box position
+        disp_seg=disp[y1:y2,x1:x2]/255
+        # We calculate the median of the disparity points
+        median = np.median(disp_seg)
+        # We now calculate the distance in meter with the following equation:
+        # distance = resize * (focal * baseline)/(pixel_size * disparity)
+        if median==0:
+            median = ((float(self.img_width)/float(self.cell_width)) * focal_lenght * baseline) / (pixel_size*(median + 0.001))
+        else:
+            median = ((float(self.img_width)/float(self.cell_width)) * focal_lenght * baseline) / (pixel_size*median)
+        return median
+
+    """ ALL DEPRECATED FUNCTIONS """
+
 
     def disp_mask(self, mask, disp, bbox, focal_lenght=1.93e-3, baseline=49.867050e-3, pixel_size=3e-6):
         """
@@ -345,41 +380,6 @@ class post_process:
         median = np.median(disp_seg.data)
         # We now calculate the distance in meter with the following equation:
         # distance = resize * (focal * baseline)/(pixel_size * disparity)+
-        if median==0:
-            median = ((float(self.img_width)/float(self.cell_width)) * focal_lenght * baseline) / (pixel_size*(median + 0.001))
-        else:
-            median = ((float(self.img_width)/float(self.cell_width)) * focal_lenght * baseline) / (pixel_size*median)
-        return median
-
-
-
-    def median_calculation(self, disp, bbox, focal_lenght=1.93e-3, baseline=49.867050e-3, pixel_size=3e-6):
-        """
-        Description:
-        ============
-        This function search the median point of the disparity map without
-        using the mask method. It returns the distance in meter.
-
-        Input:
-        ------
-        - disp: The disparity map
-        - bbox: The bounding box position of the detected objects
-        - focal_lenght: The focal lenght of the used camera (default:1.93e-3)
-        - baseline: The baseline of the setup used (default:49.867050e-3)
-        - pixel_size: The size of a pixel in the cell of the used camera (default:3e-6)
-
-        Output:
-        -------
-        - median: The distance in meter of the object based on the median of each
-        disparity value.
-        """
-        x1, y1, x2, y2 = bbox
-        # We crop the disparity map image to the bounding box position
-        disp_seg=disp[y1:y2,x1:x2]/255
-        # We calculate the median of the disparity points
-        median = np.median(disp_seg)
-        # We now calculate the distance in meter with the following equation:
-        # distance = resize * (focal * baseline)/(pixel_size * disparity)
         if median==0:
             median = ((float(self.img_width)/float(self.cell_width)) * focal_lenght * baseline) / (pixel_size*(median + 0.001))
         else:
