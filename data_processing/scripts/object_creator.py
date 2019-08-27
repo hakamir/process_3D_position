@@ -47,47 +47,14 @@ class object_creator():
         self.point_pos = self.quaternion.rotate(self.point_pos)
         self.point_pos = np.matrix([self.point_pos[0],self.point_pos[1],self.point_pos[2]]).T
         self.center = self.cam_pos + self.point_pos
-        #self.set_vertices()
         return
-
-    """
-    DEPRECATED
-    This function creates the eight vertices of the box corresponding to the object.
-    """
-    def set_vertices(self):
-
-        # Set vertices
-        self.v1 = self.quaternion.rotate(np.matrix([[self.scale[0]],[self.scale[1]],[self.scale[2]]]))
-        self.v1 = self.center + np.matrix([self.v1[0],self.v1[1],self.v1[2]])
-
-        self.v2 = self.quaternion.rotate(np.matrix([[-self.scale[0]],[self.scale[1]],[self.scale[2]]]))
-        self.v2 = self.center + np.matrix([self.v2[0],self.v2[1],self.v2[2]])
-
-        self.v3 = self.quaternion.rotate(np.matrix([[-self.scale[0]],[-self.scale[1]],[self.scale[2]]]))
-        self.v3 = self.center + np.matrix([self.v3[0],self.v3[1],self.v3[2]])
-
-        self.v4 = self.quaternion.rotate(np.matrix([[self.scale[0]],[-self.scale[1]],[self.scale[2]]]))
-        self.v4 = self.center + np.matrix([self.v4[0],self.v4[1],self.v4[2]])
-
-        self.v5 = self.quaternion.rotate(np.matrix([[self.scale[0]],[self.scale[1]],[-self.scale[2]]]))
-        self.v5 = self.center + np.matrix([self.v5[0],self.v5[1],self.v5[2]])
-
-        self.v6 = self.quaternion.rotate(np.matrix([[-self.scale[0]],[self.scale[1]],[-self.scale[2]]]))
-        self.v6 = self.center + np.matrix([self.v6[0],self.v6[1],self.v6[2]])
-
-        self.v7 = self.quaternion.rotate(np.matrix([[-self.scale[0]],[-self.scale[1]],[-self.scale[2]]]))
-        self.v7 = self.center + np.matrix([self.v7[0],self.v7[1],self.v7[2]])
-
-        self.v8 = self.quaternion.rotate(np.matrix([[self.scale[0]],[-self.scale[1]],[-self.scale[2]]]))
-        self.v8 = self.center + np.matrix([self.v8[0],self.v8[1],self.v8[2]])
-
-        self.vertices = np.array([self.v1, self.v2, self.v3, self.v4,
-                                  self.v5, self.v6, self.v7, self.v8])
-        return
-
 
     def is_inside(self, point):
         """
+
+        !!! DEPRECATED !!!
+        The iou_3D() function is used to check matching between boxes.
+
         Description:
         ============
         This method is used to indicate if a given point is inside the box
@@ -110,12 +77,59 @@ class object_creator():
         else:
             return False
 
+    def iou_3D(self, scale, point):
+        """
+        Description:
+        ============
+        This method tries to catch matching between the input scale and the
+        scale of the object. It is used to indicate if the provided box can
+        correspond to this object.
+
+        Input:
+        ------
+        - scale: a scale of a new detected object.
+        - point: the point in space of the new detected object. It must be in
+        global environment.
+
+        Output:
+        -------
+        - IoU: The Intersection of Union is returned (value between 0 and 1). It
+        corresponds to the IoU between the object box and the entry box (with
+        scale and center point).
+        """
+        # Calculate the area of both boxes
+        area = self.scale[0] * self.scale[1] * self.scale[2]
+        new_area = scale[0] * scale[1] * scale[2]
+        ratio = area/new_area
+        # Retrieve the initial (x1,x2,y1,y2,z1,z2) positions of the new box
+        x1 = point[0] - scale[0]/2
+        x2 = point[0] + scale[0]/2
+        y1 = point[1] - scale[1]/2
+        y2 = point[1] + scale[1]/2
+        z1 = point[2] - scale[2]/2
+        z2 = point[2] + scale[2]/2
+
+        # Retrieve the initial (x1,x2,y1,y2,z1,z2) positions of the actual box
+        x1p = self.center[0] - self.scale[0]/2
+        x2p = self.center[0] + self.scale[0]/2
+        y1p = self.center[1] - self.scale[1]/2
+        y2p = self.center[1] + self.scale[1]/2
+        z1p = self.center[2] - self.scale[2]/2
+        z2p = self.center[2] + self.scale[2]/2
+
+
+        # calculate the area overlap with the previous data
+        overlap = max((min(x2,x2p)-max(x1,x1p)),0)*max((min(y2,y2p)-max(y1,y1p)),0)*max((min(z2,z2p)-max(z1,z1p)),0)
+        # calculate the IoU with the previous calculated area
+        IoU = overlap / (area + new_area - overlap)
+        if type(IoU) == np.matrix:
+            return IoU.item(0)
 
     def add_point(self, point, cam_pos, quaternion, score, scale):
         """
         Description:
         ============
-        The following function set the new position of the object based of a
+        The following function set the new position of the object based on a
         given point. It also updates the existence probability score, the scale
         of the object, increase the detection iteration by one, set the rotation
         of the object on the tracking camera quaternion value and set the last

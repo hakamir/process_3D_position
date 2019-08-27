@@ -20,7 +20,7 @@ import time
 
 
 global DECAYING_TIME
-DECAYING_TIME = 5
+DECAYING_TIME = 100
 
 class areaMaker:
     """
@@ -41,7 +41,6 @@ class areaMaker:
 
         print('Initializing node...')
         rospy.init_node('areamaker_node')
-        self.IDs = []
         subObj = message_filters.Subscriber('/object/detected', PointsMsg)
         subcampos = message_filters.Subscriber('/t265/odom/sample', Odometry)
         ats = message_filters.ApproximateTimeSynchronizer([subObj, subcampos], queue_size=2, slop=0.01)
@@ -148,16 +147,15 @@ class areaMaker:
             cam_rz = cameraPosMsg.pose.pose.orientation.z
             cam_rw = cameraPosMsg.pose.pose.orientation.w
             quaternion = Quaternion(cam_rw, cam_rx, cam_ry, cam_rz)
-            qr = Quaternion(axis=[0,0,1],angle=3.14159265)
-            quaternion = quaternion*qr
 
             # The T265 tracking camera was set looking backward.
             # Then, the X and Z axis are inverted.
-            #cam_x = - cam_x
-            #cam_z = - cam_z
+            cam_x = - cam_x
+            cam_z = - cam_z
             # The rotation might be taken in consideration
             #TODO
-            #quaternion.rotate()
+            qr = Quaternion(axis=[0,0,1],angle=3.14159265)
+            quaternion = quaternion*qr
 
             #scale = (1,1,1)
 
@@ -182,9 +180,10 @@ class areaMaker:
                 print("Object class: \n{}".format(item.get_class()))
                 print("Object score: \n{}".format(round(item.get_score(),2)))
                 print("Object ID: \n{}".format(item.get_ID()))
+                print("IoU: \n{}".format(item.iou_3D(scale, global_point)))
 
                 # If the class of the added point match with the existence area it is inside, recalibrate position by doing tracking
-                if _class == item.get_class() and item.is_inside(global_point):
+                if _class == item.get_class() and item.iou_3D(scale, global_point) >= 0.5: # and item.is_inside(global_point):
                     print(Fore.GREEN + 'Point is inside.' + Style.RESET_ALL)
 
                     # Perform calibration
@@ -258,8 +257,10 @@ class areaMaker:
             self.pub.publish(objects)
             print("Detected objects: {}".format(len(self.obj_list)))
 
+
+
             # Create a new object (a limit is added for the test)
-            if not lock_obj_creator and len(self.obj_list) < 50:
+            if not lock_obj_creator:# and len(self.obj_list) < 50:
                 self.obj_list.append(object_creator(point, cam_point, scale, quaternion, _class, score, len(self.obj_list)))
             print("Processing time: {} ms".format(round((time.time()-start)*1000,3)))
 
