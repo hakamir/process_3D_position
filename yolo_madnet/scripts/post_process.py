@@ -224,6 +224,7 @@ class post_process:
                 point.scale.x = scale[0]
                 point.scale.y = scale[1]
                 point.scale.z = scale[2]
+                point.id = ID
                 point.obj_class = _class
                 point.score = score
                 # Then add each message to a list (one message per object)
@@ -345,8 +346,8 @@ class post_process:
             median = ((float(self.img_width)/float(self.cell_width)) * focal_lenght * baseline) / (pixel_size*median)
         return median
 
-    """ ALL DEPRECATED FUNCTIONS """
 
+    """ ALL DEPRECATED FUNCTIONS """
 
     def disp_mask(self, mask, disp, bbox, focal_lenght=1.93e-3, baseline=49.867050e-3, pixel_size=3e-6):
         """

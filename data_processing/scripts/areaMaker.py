@@ -68,7 +68,9 @@ class areaMaker:
         -------
         - point: The position of the input point set in global referential
         """
+        # Perform rotation based on T265 quaternion
         point = quaternion.rotate(point)
+        # Convert to numpy matrix format
         point = np.matrix([point[0],point[1],point[2]])
         point = cam_point + point.T
         return point
@@ -131,9 +133,12 @@ class areaMaker:
             x = pt.position.x
             y = pt.position.y
             z = pt.position.z
+            if z > 10:
+                continue
             point = np.matrix([[x],[y],[z]])
             _class = pt.obj_class
             score = pt.score
+            id = pt.id
             scale = (pt.scale.x, pt.scale.y, pt.scale.z)
 
             # Get the camera position (euler vector) and rotation (quaternion)
@@ -148,17 +153,6 @@ class areaMaker:
             cam_rw = cameraPosMsg.pose.pose.orientation.w
             quaternion = Quaternion(cam_rw, cam_rx, cam_ry, cam_rz)
 
-            # The T265 tracking camera was set looking backward.
-            # Then, the X and Z axis are inverted.
-            cam_x = - cam_x
-            cam_z = - cam_z
-            # The rotation might be taken in consideration
-            #TODO
-            qr = Quaternion(axis=[0,0,1],angle=3.14159265)
-            quaternion = quaternion*qr
-
-            #scale = (1,1,1)
-
             # Print the point position in the camera and global referentials
             print(Fore.BLUE + "\nPoint position: ")
             print("#-----------REFENTIALS-----------#" + Style.RESET_ALL)
@@ -169,7 +163,7 @@ class areaMaker:
 
             # If no object exists, we create a new mesh at the given position of the added point
             if len(self.obj_list) == 0:
-                self.obj_list.append(object_creator(point, cam_point, scale, quaternion, _class, score, len(self.obj_list)))
+                self.obj_list.append(object_creator(point, cam_point, scale, quaternion, _class, score, id))
 
             # Run through each existence area to check if the added point is inside and do processing
             for item in self.obj_list:
@@ -180,14 +174,13 @@ class areaMaker:
                 print("Object class: \n{}".format(item.get_class()))
                 print("Object score: \n{}".format(round(item.get_score(),2)))
                 print("Object ID: \n{}".format(item.get_ID()))
-                print("IoU: \n{}".format(item.iou_3D(scale, global_point)))
 
                 # If the class of the added point match with the existence area it is inside, recalibrate position by doing tracking
-                if _class == item.get_class() and item.iou_3D(scale, global_point) >= 0.5: # and item.is_inside(global_point):
-                    print(Fore.GREEN + 'Point is inside.' + Style.RESET_ALL)
+                if _class == item.get_class() and item.iou_3D(scale, global_point) >= 0.1: # and item.is_inside(global_point):
+                    print(Fore.GREEN + "IoU: \n{}".format(item.iou_3D(scale, global_point)) + Style.RESET_ALL)
 
                     # Perform calibration
-                    item.add_point(point, cam_point, quaternion, score, scale)
+                    #item.calibrate(point, cam_point, quaternion, score, scale)
                     print("Iteration: {}".format(item.get_iteration()))
 
                     # We verify if the point is in many existence area of the same class
@@ -204,8 +197,7 @@ class areaMaker:
 
                 # If the point is not in an existence area, let the ability to create a new one
                 else:
-                    print(Fore.RED + "Point is out!")
-                    print(Style.RESET_ALL)
+                    print(Fore.RED + "IoU: \n{}".format(item.iou_3D(scale, global_point)) + Style.RESET_ALL)
                     lock_obj_creator = False
                 print("Creation time: \n{}".format(round(item.get_creation_time() - self.time,3)))
                 try:
@@ -261,7 +253,7 @@ class areaMaker:
 
             # Create a new object (a limit is added for the test)
             if not lock_obj_creator:# and len(self.obj_list) < 50:
-                self.obj_list.append(object_creator(point, cam_point, scale, quaternion, _class, score, len(self.obj_list)))
+                self.obj_list.append(object_creator(point, cam_point, scale, quaternion, _class, score, id))
             print("Processing time: {} ms".format(round((time.time()-start)*1000,3)))
 
 if __name__ == '__main__':
