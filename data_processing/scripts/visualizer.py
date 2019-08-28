@@ -6,6 +6,8 @@
 import rospy
 from visualization_msgs.msg import Marker
 from data_processing.msg import ObjectsMsg
+from nav_msgs.msg import Odometry
+
 import random, time
 
 class visualizer:
@@ -19,8 +21,10 @@ class visualizer:
     """
     def __init__(self):
         rospy.init_node('visualizer_node')
-        rospy.Subscriber('/object/position/3D', ObjectsMsg, self.process, queue_size=10)
+        rospy.Subscriber('/object/position/3D', ObjectsMsg, self.show_object, queue_size=10)
+        rospy.Subscriber('/t265/odom/sample', Odometry, self.show_wheelchair, queue_size=10)
         self.pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
+        self.pub2 = rospy.Publisher('/wheel_chair', Marker, queue_size=1)
         self.classes = self.load_classes('../../yolo_madnet/scripts/adapt/adapt.names')
         self.colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(self.classes))]
         rospy.spin()
@@ -31,7 +35,7 @@ class visualizer:
             names = f.read().split('\n')
         return list(filter(None, names))  # filter removes empty strings (such as last line)
 
-    def process(self, msg):
+    def show_object(self, msg):
         """
         Description:
         ============
@@ -62,9 +66,9 @@ class visualizer:
         """
         for object in msg.object:
             marker = Marker()
-            marker.header.frame_id = "t265_pose_frame"
+            marker.header.frame_id = "frame"
             #marker.header.stamp = rospy.now()
-            print(object)
+            #print(object)
             marker.ns = object.obj_class
             marker.id = object.ID
 
@@ -99,6 +103,46 @@ class visualizer:
 
             marker.lifetime = rospy.Duration()
             self.pub.publish(marker)
+
+    def show_wheelchair(self, msg):
+        """
+        Description:
+        ============
+        Take the T265 camera position to publish a mesh to be visualized on rviz.
+
+        Input:
+        ------
+        - T265 camera position and rotation
+
+        Output:
+        -------
+        - A marker published for rviz showing a wheelchair at the position of
+        the tracking camera.
+        """
+        marker = Marker()
+        marker.header.frame_id = "frame"
+        marker.ns = "Wheelchair"
+        marker.id = 0
+        marker.type = 10
+        marker.mesh_resource = "package://data_processing/meshes/simplist_wheelchair.dae"
+        marker.action = 0
+        marker.pose.position.x = msg.pose.pose.position.x + 1
+        marker.pose.position.y = msg.pose.pose.position.y + 1
+        marker.pose.position.z = msg.pose.pose.position.z - 1.5
+        marker.pose.orientation.x = msg.pose.pose.orientation.w
+        marker.pose.orientation.y = msg.pose.pose.orientation.z
+        marker.pose.orientation.z = msg.pose.pose.orientation.x
+        marker.pose.orientation.w = msg.pose.pose.orientation.y
+        marker.scale.x = 0.5
+        marker.scale.y = 0.5
+        marker.scale.z = 0.5
+        marker.color.a = 1.0
+        marker.color.r = 0.2
+        marker.color.g = 0.2
+        marker.color.b = 0.2
+        marker.lifetime = rospy.Duration()
+        self.pub2.publish(marker)
+
 
 if __name__ == '__main__':
     try:
