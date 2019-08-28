@@ -125,7 +125,7 @@ class object_creator():
         if type(IoU) == np.matrix:
             return IoU.item(0)
 
-    def add_point(self, point, cam_pos, quaternion, score, scale):
+    def calibrate(self, point, cam_pos, quaternion, score, scale):
         """
         Description:
         ============

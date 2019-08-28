@@ -68,12 +68,15 @@ class visualizer:
             marker.ns = object.obj_class
             marker.id = object.ID
 
+            # Set marker type as cuboid
             marker.type = 1
+            # Only show cuboid on rviz if high detection score. Else, remove it.
             if object.score > 0.9:
                 marker.action = 0
             else:
                 marker.action = 2
 
+            # Set position and rotation of the marker
             marker.pose.position.x = object.center.z
             marker.pose.position.y = object.center.x
             marker.pose.position.z = object.center.y
@@ -82,16 +85,17 @@ class visualizer:
             marker.pose.orientation.z = object.rotation.z
             marker.pose.orientation.w = object.rotation.w
 
+            # Set marker scale
             marker.scale.x = object.scale.z
             marker.scale.y = object.scale.x
             marker.scale.z = object.scale.y
-            for cls in self.classes:
-                if object.obj_class == cls:
-                    color_index = self.classes.index(cls)
-                    marker.color.r = float(self.colors[color_index][0])/255
-                    marker.color.g = float(self.colors[color_index][1])/255
-                    marker.color.b = float(self.colors[color_index][2])/255
-                    marker.color.a = object.score
+
+            # Set marker color (one by class)
+            color_index = self.classes.index(object.obj_class)
+            marker.color.r = float(self.colors[color_index][0])/255
+            marker.color.g = float(self.colors[color_index][1])/255
+            marker.color.b = float(self.colors[color_index][2])/255
+            marker.color.a = object.score
 
             marker.lifetime = rospy.Duration()
             self.pub.publish(marker)
