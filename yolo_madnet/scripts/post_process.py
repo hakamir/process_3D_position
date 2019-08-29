@@ -156,6 +156,7 @@ class post_process:
 
             # We take a mask of the object from the disparity to improve results
             # The mask is usefull to avoid taking account of background
+            # Deprecated using median_calculation method, not with disp_mask
             #mask, img = segmentation(bbox, disparity, img)
 
             # We get the distance in meter
@@ -227,15 +228,15 @@ class post_process:
                 point.id = ID
                 point.obj_class = _class
                 point.score = score
-                # Then add each message to a list (one message per object)
-                """
+                
                 rospy.loginfo('OBJECT: {}\n SCORE: {}\n POSITION:({}, {}, {})'.format(
                         point.obj_class,
                         point.score,
-                        X,
+                        point.position.x,
                         point.position.y,
                         point.position.z))
-                """
+
+                # Then add each message to a list (one message per object)
                 points_list.point.append(point)
 
                 # Plot box to the image for visualisation

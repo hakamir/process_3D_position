@@ -25,7 +25,7 @@ class object_creator():
     """
     def __init__(self, point_pos, cam_pos, scale, quaternion, _class, score, ID):
 
-        self.point_pos = point_pos
+        self.center = point_pos
         self.cam_pos = cam_pos
         self.scale = scale
         self.quaternion = quaternion
@@ -35,19 +35,7 @@ class object_creator():
         self.iteration = 1
         self.creation_time = time.time()
         self.last_detection = self.creation_time
-        self.calculate_position()
 
-    """
-    This function is used to calculate the position of the object.
-    It refers the point position after the quaternion rotation and set the
-    center of the box.
-    """
-    def calculate_position(self):
-
-        self.point_pos = self.quaternion.rotate(self.point_pos)
-        self.point_pos = np.matrix([self.point_pos[0],self.point_pos[1],self.point_pos[2]]).T
-        self.center = self.cam_pos + self.point_pos
-        return
 
     def is_inside(self, point):
         """
@@ -76,6 +64,7 @@ class object_creator():
             return True
         else:
             return False
+
 
     def iou_3D(self, scale, point):
         """
@@ -125,6 +114,7 @@ class object_creator():
         if type(IoU) == np.matrix:
             return IoU.item(0)
 
+
     def calibrate(self, point, cam_pos, quaternion, score, scale):
         """
         Description:
@@ -143,12 +133,9 @@ class object_creator():
         - score: the detection score of the object
         - scale: the input scale of the object (x, y, z)
         """
-        for k in range(3):
-            #self.point_pos[k] = np.mean(point[k])
-            self.point_pos[k] = point[k]
         self.quaternion = quaternion
         self.scale = scale
-        self.calculate_position()
+        self.center = point
         self.iteration += 1
         self.update_score(score)
         self.last_detection = time.time()
@@ -178,9 +165,9 @@ class object_creator():
         Description:
         ============
         This method updates the existence probability of the object based on the
-        detection score as input. It takes in account every score given by iteration
-        and calculate the sigmoid (with factor 0.2) of the sum of scores to the power
-        of the number of iteration of detection.
+        detection score as input. It takes in account every score given by
+        iteration and calculate the sigmoid (with factor 0.2) of the sum of
+        scores to the power of the number of iteration of detection.
 
         Input:
         ------

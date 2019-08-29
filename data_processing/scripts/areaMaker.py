@@ -20,7 +20,7 @@ import time
 
 
 global DECAYING_TIME
-DECAYING_TIME = 100
+DECAYING_TIME = 5
 
 class areaMaker:
     """
@@ -51,7 +51,7 @@ class areaMaker:
         rospy.spin()
 
 
-    def transpose_to_global_quaternion(self, point, cam_point, quaternion):
+    def transpose_to_global(self, point, cam_point, quaternion):
         """
         Description:
         ============
@@ -71,9 +71,16 @@ class areaMaker:
         # Perform rotation based on T265 quaternion
         point = quaternion.rotate(point)
         # Convert to numpy matrix format
-        point = np.matrix([point[0],point[1],point[2]])
-        point = cam_point + point.T
-        return point
+        point = np.matrix([[point[0],
+                            point[1],
+                            point[2],
+                            1]])
+        cam_point = np.matrix([[1,0,0,cam_point[0][0]],
+                    [0,1,0,cam_point[1][0]],
+                    [0,0,1,cam_point[2][0]],
+                    [0,0,0,1]])
+        point = cam_point * point.T
+        return point[:3]
 
     def process(self, pointsMsg, cameraPosMsg):
         """
@@ -129,17 +136,21 @@ class areaMaker:
         redondance = 0
 
         for pt in pointsMsg.point:
+
             # Get the point position, class and score
-            x = pt.position.x
-            y = pt.position.y
-            z = pt.position.z
+            # Convert point referential to camera referential
+            x = pt.position.z
+            y = pt.position.x
+            z = pt.position.y
+            print(z)
             if z > 10:
                 continue
-            point = np.matrix([[x],[y],[z]])
+            local_point = np.matrix([[x],[y],[z]])
             _class = pt.obj_class
             score = pt.score
             id = pt.id
-            scale = (pt.scale.x, pt.scale.y, pt.scale.z)
+            scale = (pt.scale.z, pt.scale.x, pt.scale.y)
+
 
             # Get the camera position (euler vector) and rotation (quaternion)
             cam_x = cameraPosMsg.pose.pose.position.x
@@ -147,114 +158,126 @@ class areaMaker:
             cam_z = cameraPosMsg.pose.pose.position.z
             cam_point = np.matrix([[cam_x], [cam_y], [cam_z]])
 
-            cam_rx = cameraPosMsg.pose.pose.orientation.x
-            cam_ry = cameraPosMsg.pose.pose.orientation.y
-            cam_rz = cameraPosMsg.pose.pose.orientation.z
-            cam_rw = cameraPosMsg.pose.pose.orientation.w
+            # If tracking camera is looking ahead
+            # cam_rx = cameraPosMsg.pose.pose.orientation.x
+            # cam_ry = cameraPosMsg.pose.pose.orientation.y
+            # cam_rz = cameraPosMsg.pose.pose.orientation.z
+            # cam_rw = cameraPosMsg.pose.pose.orientation.w
+
+            # Else if tracking camera is looking behind
+            cam_rx =   cameraPosMsg.pose.pose.orientation.z
+            cam_ry =   cameraPosMsg.pose.pose.orientation.w
+            cam_rz = - cameraPosMsg.pose.pose.orientation.x
+            cam_rw =   cameraPosMsg.pose.pose.orientation.y
             quaternion = Quaternion(cam_rw, cam_rx, cam_ry, cam_rz)
+
 
             # Print the point position in the camera and global referentials
             print(Fore.BLUE + "\nPoint position: ")
             print("#-----------REFENTIALS-----------#" + Style.RESET_ALL)
-            print("Camera referential: \n{}".format(point))
-            global_point = self.transpose_to_global_quaternion(point, cam_point, quaternion)
+            print("Camera referential: \n{}".format(local_point))
+
+            global_point = self.transpose_to_global(local_point, cam_point, quaternion)
             print("Global referential: \n{}".format(global_point))
             print(Fore.BLUE + "#-----------ALL OBJECTS-----------#")
 
+
             # If no object exists, we create a new mesh at the given position of the added point
             if len(self.obj_list) == 0:
-                self.obj_list.append(object_creator(point, cam_point, scale, quaternion, _class, score, id))
+                self.obj_list.append(object_creator(global_point, cam_point, scale, quaternion, _class, score, id))
+
 
             # Run through each existence area to check if the added point is inside and do processing
             for item in self.obj_list:
-                print(Fore.BLUE + "#-----------Item {}-----------#".format(self.obj_list.index(item)) + Style.RESET_ALL)
-                print("Object center: \n{}".format(item.get_center()))
-                print("camera position: \n{}".format((cam_x,cam_y,cam_z)))
-                print("Object scale: \n{}".format(item.get_scale()))
-                print("Object class: \n{}".format(item.get_class()))
-                print("Object score: \n{}".format(round(item.get_score(),2)))
-                print("Object ID: \n{}".format(item.get_ID()))
+                # If the class of the item doesn't match with detection, skip
 
-                # If the class of the added point match with the existence area it is inside, recalibrate position by doing tracking
-                if _class == item.get_class() and item.iou_3D(scale, global_point) >= 0.1: # and item.is_inside(global_point):
-                    print(Fore.GREEN + "IoU: \n{}".format(item.iou_3D(scale, global_point)) + Style.RESET_ALL)
-
-                    # Perform calibration
-                    #item.calibrate(point, cam_point, quaternion, score, scale)
-                    print("Iteration: {}".format(item.get_iteration()))
-
-                    # We verify if the point is in many existence area of the same class
-                    redondance += 1
-
-                    # We correct the duplication problem by removing an overcrafting of mesh
-                    if redondance > 1:
-                        self.obj_list.remove(item)
-                        break
-                    print("redondance: {}".format(redondance))
-
-                    # Say that no object must be created
-                    lock_obj_creator = True
-
-                # If the point is not in an existence area, let the ability to create a new one
-                else:
-                    print(Fore.RED + "IoU: \n{}".format(item.iou_3D(scale, global_point)) + Style.RESET_ALL)
+                if not _class == item.get_class():
+                    print(_class, item.get_class())
                     lock_obj_creator = False
-                print("Creation time: \n{}".format(round(item.get_creation_time() - self.time,3)))
-                try:
-                    dt = time.time() - item.get_last_detection_time()
-                    print("Last detection: \n{}".format(round(dt,6)))
-                    # If an object haven't been detected since a specific time, remove it.
-                    if dt > DECAYING_TIME:
-                        self.obj_list.remove(item)
+                    continue
+
+                else:
+                    print(Fore.BLUE + "#-----------Item {}-----------#".format(self.obj_list.index(item)) + Style.RESET_ALL)
+                    print("Object center: \n{}".format(item.get_center()))
+                    print("camera position: \n{}".format((cam_x,cam_y,cam_z)))
+                    print("Object scale: \n{}".format(item.get_scale()))
+                    print("Object class: \n{}".format(item.get_class()))
+                    print("Object score: \n{}".format(round(item.get_score(),2)))
+                    print("Object ID: \n{}".format(item.get_ID()))
+                    iou = item.iou_3D(scale, global_point)
+                    if iou >= 0.1: # and item.is_inside(global_point):
+                        print(Fore.GREEN + "IoU: \n{}".format(iou) + Style.RESET_ALL)
 
 
-                # Avoid synchronization error (rare normally)
-                except AttributeError:
-                    print("ERROR: Cannot get last detection time.")
+                        # Perform calibration
+                        item.calibrate(global_point, cam_point, quaternion, score, scale)
+                        print("Iteration: {}".format(item.get_iteration()))
 
-                # get all data Publish the position of the object
-                msg_center = item.get_center()
-                msg_scale = item.get_scale()
-                msg_rotation = item.get_quaternion()
-                msg_class = item.get_class()
-                msg_score = item.get_score()
-                msg_ID = item.get_ID()
-                msg_creation_time = item.get_creation_time()
-                msg_last_detection_time = item.get_last_detection_time()
-                now = rospy.get_rostime()
-                object = ObjectMsg()
-                object.header.stamp.secs = now.secs
-                object.header.stamp.nsecs = now.nsecs
-                object.center.x = msg_center[0]
-                object.center.y = msg_center[1]
-                object.center.z = msg_center[2]
-                object.scale.x = msg_scale[0]
-                object.scale.y = msg_scale[1]
-                object.scale.z = msg_scale[2]
-                object.rotation.w = msg_rotation[0]
-                object.rotation.x = msg_rotation[1]
-                object.rotation.y = msg_rotation[2]
-                object.rotation.z = msg_rotation[3]
-                object.creation_time = msg_creation_time
-                object.last_detection_time = msg_last_detection_time
-                object.obj_class = msg_class
-                object.score = msg_score
-                object.ID = msg_ID
-                objects.object.append(object)
+                        # Say that no object must be created
+                        lock_obj_creator = True
 
-            # Print the number of detected objects in the environment
-            now = rospy.get_rostime()
-            objects.header.stamp.secs = now.secs
-            objects.header.stamp.nsecs = now.nsecs
-            self.pub.publish(objects)
-            print("Detected objects: {}".format(len(self.obj_list)))
+                        # get all data Publish the position of the object
+                        msg_center = item.get_center()
+                        msg_scale = item.get_scale()
+                        msg_rotation = item.get_quaternion()
+                        msg_class = item.get_class()
+                        msg_score = item.get_score()
+                        msg_ID = item.get_ID()
+                        msg_creation_time = item.get_creation_time()
+                        msg_last_detection_time = item.get_last_detection_time()
+                        now = rospy.get_rostime()
+                        object = ObjectMsg()
+                        object.header.stamp.secs = now.secs
+                        object.header.stamp.nsecs = now.nsecs
+                        object.center.x = msg_center[0]
+                        object.center.y = msg_center[1]
+                        object.center.z = msg_center[2]
+                        object.scale.x = msg_scale[0]
+                        object.scale.y = msg_scale[1]
+                        object.scale.z = msg_scale[2]
+                        object.rotation.w = msg_rotation[0]
+                        object.rotation.x = msg_rotation[1]
+                        object.rotation.y = msg_rotation[2]
+                        object.rotation.z = msg_rotation[3]
+                        object.creation_time = msg_creation_time
+                        object.last_detection_time = msg_last_detection_time
+                        object.obj_class = msg_class
+                        object.score = msg_score
+                        object.ID = msg_ID
+                        objects.object.append(object)
+                        break
 
+                    # If the box doesn't match the existence area...
+                    # let the ability to create a new one
+                    else:
+                        print(Fore.RED + "IoU: \n{}".format(iou) + Style.RESET_ALL)
+                        lock_obj_creator = False
+                    print("Creation time: \n{}".format(round(item.get_creation_time() - self.time,3)))
+
+                    try:
+                        dt = time.time() - item.get_last_detection_time()
+                        print("Last detection: \n{}".format(round(dt,6)))
+                        # If an object haven't been detected since a specific time, remove it.
+                        if dt > DECAYING_TIME:
+                            self.obj_list.remove(item)
+
+
+                    # Avoid synchronization error (rare normally)
+                    except AttributeError:
+                        print("ERROR: Cannot get last detection time.")
 
 
             # Create a new object (a limit is added for the test)
-            if not lock_obj_creator:# and len(self.obj_list) < 50:
-                self.obj_list.append(object_creator(point, cam_point, scale, quaternion, _class, score, id))
+            if not lock_obj_creator:# and len(self.obj_list) < 5:
+                self.obj_list.append(object_creator(global_point, cam_point, scale, quaternion, _class, score, id))
             print("Processing time: {} ms".format(round((time.time()-start)*1000,3)))
+
+        # Print the number of detected objects in the environment
+        now = rospy.get_rostime()
+        objects.header.stamp.secs = now.secs
+        objects.header.stamp.nsecs = now.nsecs
+        self.pub.publish(objects)
+        print("Detected objects: {}".format(len(self.obj_list)))
 
 if __name__ == '__main__':
     try:

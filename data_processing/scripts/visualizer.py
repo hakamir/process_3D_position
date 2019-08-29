@@ -81,18 +81,19 @@ class visualizer:
                 marker.action = 2
 
             # Set position and rotation of the marker
-            marker.pose.position.x = object.center.z
-            marker.pose.position.y = object.center.x
-            marker.pose.position.z = object.center.y
+            marker.pose.position.x = object.center.x
+            marker.pose.position.y = object.center.y
+            marker.pose.position.z = object.center.z
+            print(marker.pose.position.x,marker.pose.position.y,marker.pose.position.z)
             marker.pose.orientation.x = object.rotation.x
             marker.pose.orientation.y = object.rotation.y
             marker.pose.orientation.z = object.rotation.z
             marker.pose.orientation.w = object.rotation.w
 
             # Set marker scale
-            marker.scale.x = object.scale.z
-            marker.scale.y = object.scale.x
-            marker.scale.z = object.scale.y
+            marker.scale.x = object.scale.x
+            marker.scale.y = object.scale.y
+            marker.scale.z = object.scale.z
 
             # Set marker color (one by class)
             color_index = self.classes.index(object.obj_class)
@@ -120,26 +121,48 @@ class visualizer:
         the tracking camera.
         """
         marker = Marker()
+        # Set the "fixed frame" parameter
         marker.header.frame_id = "frame"
+        #Set name
         marker.ns = "Wheelchair"
+        # Set ID
         marker.id = 0
+        # Set marker type as mesh
         marker.type = 10
+        # Set the path of the mesh to show (must be .dae, .mesh or .stl)
         marker.mesh_resource = "package://data_processing/meshes/simplist_wheelchair.dae"
+
+        # Add / adjust position of the marker
         marker.action = 0
+
+        # Set position to the marker, add values to adjust position
         marker.pose.position.x = msg.pose.pose.position.x + 1
         marker.pose.position.y = msg.pose.pose.position.y + 1
         marker.pose.position.z = msg.pose.pose.position.z - 1.5
-        marker.pose.orientation.x = msg.pose.pose.orientation.w
-        marker.pose.orientation.y = msg.pose.pose.orientation.z
-        marker.pose.orientation.z = msg.pose.pose.orientation.x
-        marker.pose.orientation.w = msg.pose.pose.orientation.y
+
+        # If tracking camera is looking ahead
+        # marker.pose.orientation.x = msg.pose.pose.orientation.x
+        # marker.pose.orientation.y = msg.pose.pose.orientation.y
+        # marker.pose.orientation.z = msg.pose.pose.orientation.z
+        # marker.pose.orientation.w = msg.pose.pose.orientation.w
+
+        # Else if tracking camera is looking behind
+        marker.pose.orientation.x =   msg.pose.pose.orientation.z
+        marker.pose.orientation.y =   msg.pose.pose.orientation.w
+        marker.pose.orientation.z = - msg.pose.pose.orientation.x
+        marker.pose.orientation.w =   msg.pose.pose.orientation.y
+
+        # Set scale of marker (must be 1 if the mesh is well design)
         marker.scale.x = 0.5
         marker.scale.y = 0.5
         marker.scale.z = 0.5
+
+        # Set color of the marker
         marker.color.a = 1.0
         marker.color.r = 0.2
         marker.color.g = 0.2
         marker.color.b = 0.2
+
         marker.lifetime = rospy.Duration()
         self.pub2.publish(marker)
 
