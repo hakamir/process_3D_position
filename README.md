@@ -17,7 +17,7 @@ Here's the ROS architecture :
 
 ![alt text](https://github.com/hakamir/process_3D_position/blob/master/ROS_diagram.png)
 
-We use different projects from GitHub that are listed below in Ressources.
+We use different projects from GitHub that are listed below in [Ressources](https://github.com/hakamir/process_3D_position#ressources).
 
 Here's a brief description of each node of the project:
 
@@ -33,7 +33,7 @@ Here's a brief description of each node of the project:
 
 ## Usage:
 
-The repository is separate in two packages: *yolo_madnet* containing:
+The repository is separated in two packages: *yolo_madnet* containing:
 - *detection*
 - *madnet*
 - *post_process*
@@ -108,8 +108,8 @@ https://github.com/abewley/sort
 
 ## Issues and works in progress
 
-The *post_process* node isn't good for now. The position of objects in 3D aren't well adjust and a Kalman filter must be added (meaning implementing Sort).
+Position of objects aren't precise. It depends on the quality of the detector and the behavior of your mobile support.
 
-Moreover, MADNet has never been trained in Indoor situation. So the distance estimation might be often wrong.
+Moreover, MADNet has never been trained in Indoor situation. So the distance estimation might be often wrong (especially for large distance). By the way, for Indoor context, the results are quite satisfying for now.
 
-With the combination of the two points below, a high noise persist when placing the 3D boxes in global environment. So, high works must be done about that subject.
+At last, the visualization and the selection of interesting and trustable data is not finished and must be highly improved.
