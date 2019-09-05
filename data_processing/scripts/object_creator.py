@@ -4,7 +4,7 @@
 @author: Latour Rodolphe
 """
 
-from math import cos, sin, pi, sqrt, exp
+from math import cos, sin, pi, sqrt, exp, atan
 import numpy as np
 import time
 from pyquaternion import Quaternion
@@ -90,6 +90,7 @@ class object_creator():
         area = self.scale[0] * self.scale[1] * self.scale[2]
         new_area = scale[0] * scale[1] * scale[2]
         ratio = area/new_area
+
         # Retrieve the initial (x1,x2,y1,y2,z1,z2) positions of the new box
         x1 = point[0] - scale[0]/2
         x2 = point[0] + scale[0]/2
@@ -106,13 +107,15 @@ class object_creator():
         z1p = self.center[2] - self.scale[2]/2
         z2p = self.center[2] + self.scale[2]/2
 
-
         # calculate the area overlap with the previous data
         overlap = max((min(x2,x2p)-max(x1,x1p)),0)*max((min(y2,y2p)-max(y1,y1p)),0)*max((min(z2,z2p)-max(z1,z1p)),0)
+
         # calculate the IoU with the previous calculated area
         IoU = overlap / (area + new_area - overlap)
-        if type(IoU) == np.matrix:
+        try:
             return IoU.item(0)
+        except:
+            return 0
 
 
     def calibrate(self, point, cam_pos, quaternion, score, scale):
@@ -134,57 +137,47 @@ class object_creator():
         - scale: the input scale of the object (x, y, z)
         """
         self.quaternion = quaternion
+        IoU = self.iou_3D(scale, point)
         self.scale = scale
         self.center = point
         self.iteration += 1
-        self.update_score(score)
+        # Lock to 1000 to avoid overcomsumption of memory
+        if self.iteration > 1000:
+            self.iteration = 1000
+        self.score = self.logistic(self.iteration, IoU, score)
         self.last_detection = time.time()
         return
 
-
-    def sigmoid(self, x, k):
+    def logistic(self, iteration, IoU, score):
         """
         Description:
         ============
-        A simple sigmoid function. It calculates the sum of the score to the
-        power of the number of iteration.
-
-        The more the iteration will be and the higher the score is, the more
-        possible the object exists.
+        A logistic function use to provide the existence probability score of
+        the object depending the entry.
 
         Input:
         ------
-        - x: the sum of the score
-        - k: the iteration number
-        """
-        return 1/(1 + exp(-x*k))
+        - iteration: The number of detection of the object (in frame)
+        - IoU: The IoU returned between the entry box and the self box
+        (see iou_3D method)
+        - score: The detection score
 
-
-    def update_score(self, score):
-        """
-        Description:
-        ============
-        This method updates the existence probability of the object based on the
-        detection score as input. It takes in account every score given by
-        iteration and calculate the sigmoid (with factor 0.2) of the sum of
-        scores to the power of the number of iteration of detection.
-
-        Input:
-        ------
-        - score: The score of the detection
 
         Output:
         -------
-        - score: The probability existence of the object
+        - The existence probability score of the object depending the parameters
         """
-        tmp = self.score + score
-        try:
-            self.score = self.sigmoid(tmp**self.iteration, 0.2)
-        except OverflowError:
-            self.iteration = 0
-            print("Reset iteration to 0 due to OverflowError.")
-        return self.score
+        return (2.0 / pi) * atan((iteration - 1) * IoU * score)
 
+    def decaying(self):
+        """
+        Description:
+        ============
+        Use it to decrease the iteration number. It can be used to destroy
+        an object if it hasn't been detected for a long time (used with del)
+        or to decrease its existence probability score.
+        """
+        self.iteration -= 1
 
     def get_center(self):
         """
@@ -226,6 +219,9 @@ class object_creator():
         Return the ID of the object
         """
         return self.ID
+
+    def set_ID(self, id):
+        self.ID = id
 
 
     def get_vertice_coordinate(self, vertice):

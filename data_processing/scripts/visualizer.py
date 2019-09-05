@@ -25,8 +25,11 @@ class visualizer:
         rospy.Subscriber('/t265/odom/sample', Odometry, self.show_wheelchair, queue_size=10)
         self.pub = rospy.Publisher('/visualization_marker', Marker, queue_size=1)
         self.pub2 = rospy.Publisher('/wheel_chair', Marker, queue_size=1)
+
         self.classes = self.load_classes('../../yolo_madnet/scripts/adapt/adapt.names')
         self.colors = [[random.randint(0, 255) for _ in range(3)] for _ in range(len(self.classes))]
+        self.tracking_camera_orientation = "behind"
+
         rospy.spin()
 
     def load_classes(self, path):
@@ -75,7 +78,7 @@ class visualizer:
             # Set marker type as cuboid
             marker.type = 1
             # Only show cuboid on rviz if high detection score. Else, remove it.
-            if object.score > 0.9:
+            if object.score > 0.5:
                 marker.action = 0
             else:
                 marker.action = 2
@@ -84,7 +87,6 @@ class visualizer:
             marker.pose.position.x = object.center.x
             marker.pose.position.y = object.center.y
             marker.pose.position.z = object.center.z
-            print(marker.pose.position.x,marker.pose.position.y,marker.pose.position.z)
             marker.pose.orientation.x = object.rotation.x
             marker.pose.orientation.y = object.rotation.y
             marker.pose.orientation.z = object.rotation.z
@@ -130,32 +132,40 @@ class visualizer:
         # Set marker type as mesh
         marker.type = 10
         # Set the path of the mesh to show (must be .dae, .mesh or .stl)
-        marker.mesh_resource = "package://data_processing/meshes/simplist_wheelchair.dae"
+        marker.mesh_resource = "package://data_processing/meshes/wheelchair_basic.stl"
+
 
         # Add / adjust position of the marker
         marker.action = 0
 
         # Set position to the marker, add values to adjust position
-        marker.pose.position.x = msg.pose.pose.position.x + 1
-        marker.pose.position.y = msg.pose.pose.position.y + 1
-        marker.pose.position.z = msg.pose.pose.position.z - 1.5
+        # if using wheelchair_basic.stl, set position:
+        # x - 0.5
+        # y
+        # z - 1.7
+        # This is to set the center of mesh to the tracking camera position
+        marker.pose.position.x = msg.pose.pose.position.x - 0.5
+        marker.pose.position.y = msg.pose.pose.position.y
+        marker.pose.position.z = msg.pose.pose.position.z - 1.7
 
         # If tracking camera is looking ahead
-        # marker.pose.orientation.x = msg.pose.pose.orientation.x
-        # marker.pose.orientation.y = msg.pose.pose.orientation.y
-        # marker.pose.orientation.z = msg.pose.pose.orientation.z
-        # marker.pose.orientation.w = msg.pose.pose.orientation.w
+        if self.tracking_camera_orientation == "ahead":
+            marker.pose.orientation.x = msg.pose.pose.orientation.x
+            marker.pose.orientation.y = msg.pose.pose.orientation.y
+            marker.pose.orientation.z = msg.pose.pose.orientation.z
+            marker.pose.orientation.w = msg.pose.pose.orientation.w
 
         # Else if tracking camera is looking behind
-        marker.pose.orientation.x =   msg.pose.pose.orientation.z
-        marker.pose.orientation.y =   msg.pose.pose.orientation.w
-        marker.pose.orientation.z = - msg.pose.pose.orientation.x
-        marker.pose.orientation.w =   msg.pose.pose.orientation.y
+        elif self.tracking_camera_orientation == "behind":
+            marker.pose.orientation.x =   msg.pose.pose.orientation.z
+            marker.pose.orientation.y =   msg.pose.pose.orientation.w
+            marker.pose.orientation.z = - msg.pose.pose.orientation.x
+            marker.pose.orientation.w =   msg.pose.pose.orientation.y
 
         # Set scale of marker (must be 1 if the mesh is well design)
-        marker.scale.x = 0.5
-        marker.scale.y = 0.5
-        marker.scale.z = 0.5
+        marker.scale.x = 1
+        marker.scale.y = 1
+        marker.scale.z = 1
 
         # Set color of the marker
         marker.color.a = 1.0

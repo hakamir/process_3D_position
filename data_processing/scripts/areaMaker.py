@@ -20,7 +20,7 @@ import time
 
 
 global DECAYING_TIME
-DECAYING_TIME = 5
+DECAYING_TIME = 50
 
 class areaMaker:
     """
@@ -46,6 +46,8 @@ class areaMaker:
         ats = message_filters.ApproximateTimeSynchronizer([subObj, subcampos], queue_size=2, slop=0.01)
         ats.registerCallback(self.process)
         self.obj_list = []
+        # Set the tracking camera orientation (looks 'ahead' or 'behind')
+        self.tracking_camera_orientation = "behind"
         self.pub = rospy.Publisher('/object/position/3D', ObjectsMsg, queue_size=1)
         self.time =time.time()
         rospy.spin()
@@ -140,15 +142,23 @@ class areaMaker:
             # Get the point position, class and score
             # Convert point referential to camera referential
             x = pt.position.z
-            y = pt.position.x
+            y = - pt.position.x
             z = pt.position.y
-            print(z)
-            if z > 10:
+
+            # We don't want to care about object distance upper 8 meters
+            if pt.position.z > 8:
                 continue
+
+            # Create a matrix for local point
             local_point = np.matrix([[x],[y],[z]])
+
+            # Get class, score and ID of the object
             _class = pt.obj_class
             score = pt.score
             id = pt.id
+
+            # Get the scale of the object's box
+            # Convert scale referential to camera referential
             scale = (pt.scale.z, pt.scale.x, pt.scale.y)
 
 
@@ -159,27 +169,32 @@ class areaMaker:
             cam_point = np.matrix([[cam_x], [cam_y], [cam_z]])
 
             # If tracking camera is looking ahead
-            # cam_rx = cameraPosMsg.pose.pose.orientation.x
-            # cam_ry = cameraPosMsg.pose.pose.orientation.y
-            # cam_rz = cameraPosMsg.pose.pose.orientation.z
-            # cam_rw = cameraPosMsg.pose.pose.orientation.w
+            if self.tracking_camera_orientation == "ahead":
+                cam_rx = cameraPosMsg.pose.pose.orientation.x
+                cam_ry = cameraPosMsg.pose.pose.orientation.y
+                cam_rz = cameraPosMsg.pose.pose.orientation.z
+                cam_rw = cameraPosMsg.pose.pose.orientation.w
 
             # Else if tracking camera is looking behind
-            cam_rx =   cameraPosMsg.pose.pose.orientation.z
-            cam_ry =   cameraPosMsg.pose.pose.orientation.w
-            cam_rz = - cameraPosMsg.pose.pose.orientation.x
-            cam_rw =   cameraPosMsg.pose.pose.orientation.y
+            elif self.tracking_camera_orientation == "behind":
+                cam_rx =   cameraPosMsg.pose.pose.orientation.z
+                cam_ry =   cameraPosMsg.pose.pose.orientation.w
+                cam_rz = - cameraPosMsg.pose.pose.orientation.x
+                cam_rw =   cameraPosMsg.pose.pose.orientation.y
+
+            # Set data as a Quaternion object to manage easy transformation
             quaternion = Quaternion(cam_rw, cam_rx, cam_ry, cam_rz)
 
 
-            # Print the point position in the camera and global referentials
             print(Fore.BLUE + "\nPoint position: ")
             print("#-----------REFENTIALS-----------#" + Style.RESET_ALL)
+            # Print the point position in the camera referential
             print("Camera referential: \n{}".format(local_point))
 
+            # Print the point position in the global referential
             global_point = self.transpose_to_global(local_point, cam_point, quaternion)
             print("Global referential: \n{}".format(global_point))
-            print(Fore.BLUE + "#-----------ALL OBJECTS-----------#")
+            print(Fore.BLUE + "#-----------ALL OBJECTS-----------#" + Style.RESET_ALL)
 
 
             # If no object exists, we create a new mesh at the given position of the added point
@@ -187,63 +202,46 @@ class areaMaker:
                 self.obj_list.append(object_creator(global_point, cam_point, scale, quaternion, _class, score, id))
 
 
-            # Run through each existence area to check if the added point is inside and do processing
+            # Run through each box created
             for item in self.obj_list:
-                # If the class of the item doesn't match with detection, skip
 
+                # If the class of the item doesn't match with detection, skip
                 if not _class == item.get_class():
-                    print(_class, item.get_class())
+                    # Let the possibility to create a new object
                     lock_obj_creator = False
                     continue
 
-                else:
-                    print(Fore.BLUE + "#-----------Item {}-----------#".format(self.obj_list.index(item)) + Style.RESET_ALL)
-                    print("Object center: \n{}".format(item.get_center()))
-                    print("camera position: \n{}".format((cam_x,cam_y,cam_z)))
-                    print("Object scale: \n{}".format(item.get_scale()))
-                    print("Object class: \n{}".format(item.get_class()))
-                    print("Object score: \n{}".format(round(item.get_score(),2)))
-                    print("Object ID: \n{}".format(item.get_ID()))
+                elif id == item.get_ID():
+                    self.show_item_info(item, cam_point)
                     iou = item.iou_3D(scale, global_point)
-                    if iou >= 0.1: # and item.is_inside(global_point):
+                    print(Fore.GREEN + "IoU: \n{}".format(iou) + Style.RESET_ALL)
+                    item.calibrate(global_point, cam_point, quaternion, score, scale)
+                    lock_obj_creator = True
+
+                    # Be careful!!!
+                    # The ID sent is NOT the ID provided by Sort (cause it is
+                    # unstable). So, we send for rviz the index of the item in
+                    # the item list because it is unique. 
+                    object = self.send_data(item, self.obj_list.index(item))
+                    objects.object.append(object)
+                    break
+
+
+                else:
+                    self.show_item_info(item, cam_point)
+                    iou = item.iou_3D(scale, global_point)
+                    if iou > 0: # and item.is_inside(global_point):
                         print(Fore.GREEN + "IoU: \n{}".format(iou) + Style.RESET_ALL)
 
 
                         # Perform calibration
                         item.calibrate(global_point, cam_point, quaternion, score, scale)
-                        print("Iteration: {}".format(item.get_iteration()))
+                        item.set_ID(id)
 
                         # Say that no object must be created
                         lock_obj_creator = True
 
-                        # get all data Publish the position of the object
-                        msg_center = item.get_center()
-                        msg_scale = item.get_scale()
-                        msg_rotation = item.get_quaternion()
-                        msg_class = item.get_class()
-                        msg_score = item.get_score()
-                        msg_ID = item.get_ID()
-                        msg_creation_time = item.get_creation_time()
-                        msg_last_detection_time = item.get_last_detection_time()
-                        now = rospy.get_rostime()
-                        object = ObjectMsg()
-                        object.header.stamp.secs = now.secs
-                        object.header.stamp.nsecs = now.nsecs
-                        object.center.x = msg_center[0]
-                        object.center.y = msg_center[1]
-                        object.center.z = msg_center[2]
-                        object.scale.x = msg_scale[0]
-                        object.scale.y = msg_scale[1]
-                        object.scale.z = msg_scale[2]
-                        object.rotation.w = msg_rotation[0]
-                        object.rotation.x = msg_rotation[1]
-                        object.rotation.y = msg_rotation[2]
-                        object.rotation.z = msg_rotation[3]
-                        object.creation_time = msg_creation_time
-                        object.last_detection_time = msg_last_detection_time
-                        object.obj_class = msg_class
-                        object.score = msg_score
-                        object.ID = msg_ID
+                        object = self.send_data(item, self.obj_list.index(item))
                         objects.object.append(object)
                         break
 
@@ -268,7 +266,7 @@ class areaMaker:
 
 
             # Create a new object (a limit is added for the test)
-            if not lock_obj_creator:# and len(self.obj_list) < 5:
+            if not lock_obj_creator:# and len(self.obj_list) < 2:
                 self.obj_list.append(object_creator(global_point, cam_point, scale, quaternion, _class, score, id))
             print("Processing time: {} ms".format(round((time.time()-start)*1000,3)))
 
@@ -278,6 +276,80 @@ class areaMaker:
         objects.header.stamp.nsecs = now.nsecs
         self.pub.publish(objects)
         print("Detected objects: {}".format(len(self.obj_list)))
+
+    def send_data(self, item, id):
+        """
+        Description:
+        ============
+        Use this to set all data regarding the item in an object ROS message.
+        It set header, position and rotation, class, existence probability
+        score, id and time details on the message.
+
+        Input:
+        ------
+        - item: an object from object_creator class.
+
+        Output:
+        -------
+        - object: a ROS type message from ObjectMsg.msg. It is used to be
+        appended in ROS type message from ObjectsMsg.msg.
+        """
+        # get all data Publish the position of the object
+        msg_center = item.get_center()
+        msg_scale = item.get_scale()
+        msg_rotation = item.get_quaternion()
+        msg_class = item.get_class()
+        msg_score = item.get_score()
+        msg_ID = id #item.get_ID()
+        msg_creation_time = item.get_creation_time()
+        msg_last_detection_time = item.get_last_detection_time()
+        now = rospy.get_rostime()
+        object = ObjectMsg()
+        object.header.stamp.secs = now.secs
+        object.header.stamp.nsecs = now.nsecs
+        object.center.x = msg_center[0]
+        object.center.y = msg_center[1]
+        object.center.z = msg_center[2]
+        object.scale.x = msg_scale[0]
+        object.scale.y = msg_scale[1]
+        object.scale.z = msg_scale[2]
+        object.rotation.w = msg_rotation[0]
+        object.rotation.x = msg_rotation[1]
+        object.rotation.y = msg_rotation[2]
+        object.rotation.z = msg_rotation[3]
+        object.creation_time = msg_creation_time
+        object.last_detection_time = msg_last_detection_time
+        object.obj_class = msg_class
+        object.score = msg_score
+        object.ID = msg_ID
+        return object
+
+    def show_item_info(self, item, cam_point):
+        """
+        Description:
+        ============
+        Use it to show basic information from an object_creator object. It also
+        provides camera position.
+
+        Order of the print:
+        -------------------
+        - center: Center on the object
+        - camera position: obvious
+        - scale: The scale of the 3D bounding box
+        - class: The class of the object (type of)
+        - score: The existence probability score of the object
+        - ID: The ID dedicated to the object
+        """
+
+        print(Fore.BLUE + "#-----------Item {}-----------#".format(self.obj_list.index(item)) + Style.RESET_ALL)
+        print("Object center: \n{}".format(item.get_center()))
+        print("camera position: \n{}".format((cam_point[0],cam_point[1],cam_point[2])))
+        print("Object scale: \n{}".format(item.get_scale()))
+        print("Object class: \n{}".format(item.get_class()))
+        print("Object score: \n{}".format(round(item.get_score(),2)))
+        print("Object ID: \n{}".format(item.get_ID()))
+        print("Iteration: {}".format(item.get_iteration()))
+
 
 if __name__ == '__main__':
     try:
