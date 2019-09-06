@@ -135,7 +135,6 @@ class areaMaker:
         start = time.time()
 
         objects = ObjectsMsg()
-        redondance = 0
 
         for pt in pointsMsg.point:
 
@@ -221,7 +220,7 @@ class areaMaker:
                     # Be careful!!!
                     # The ID sent is NOT the ID provided by Sort (cause it is
                     # unstable). So, we send for rviz the index of the item in
-                    # the item list because it is unique. 
+                    # the item list because it is unique.
                     object = self.send_data(item, self.obj_list.index(item))
                     objects.object.append(object)
                     break
@@ -288,6 +287,7 @@ class areaMaker:
         Input:
         ------
         - item: an object from object_creator class.
+        - id: The id of the object. Not the Sort one to avoid misinformation.
 
         Output:
         -------
