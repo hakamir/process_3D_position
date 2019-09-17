@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
   message_generation
   geometry_msgs
+  message_filters
 )
 
 ## Generate messages in the 'msg' folder
@@ -38,3 +39,6 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
+add_executable(areaMaker_cpp_node src/areaMaker.cpp)
+target_link_libraries(areaMaker_cpp_node ${catkin_LIBRARIES})
+add_dependencies(areaMaker_cpp_node ${catkin_EXPORTED_TARGETS})
