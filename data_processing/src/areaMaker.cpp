@@ -1,5 +1,4 @@
 #include "../include/areaMaker.h"
-#include "../include/objectCreator.h"
 
 using namespace yolo_madnet;
 using namespace std;
@@ -12,10 +11,9 @@ might be used to replace the python version for a more efficient one.
 
 areaMaker::areaMaker()
 {
-  cout << "Initialize subscribers..." << endl;
   subObj.subscribe(nh, "/object/detected", 1);
   subCamPos.subscribe(nh, "/t265/odom/sample", 1);
-  sync.reset(new Sync(_SyncPolicy(2), subObj, subCamPos));
+  sync.reset(new Sync(_SyncPolicy(10), subObj, subCamPos));
   sync->registerCallback(boost::bind(&areaMaker::callback, this, _1, _2));
 }
 
@@ -44,8 +42,23 @@ void areaMaker::rotateVectorByQuaternion(const struct Vector3& v, const struct Q
     vprime.y = num14;
     vprime.z = num13;
 }
+/***
+  Description:
+  ============
+  This function is used to transpose the position of the point into global
+  referential based on the tracking camera position.
 
-struct areaMaker::Vector3 areaMaker::transposeToGlobal(struct Vector3 point, struct Vector3 camPoint, struct Quaternion quaternion)
+  Input:
+  ------
+  - point: The position of the point (x,y,z) based on the camera referential
+  - cam_point: The position of the tracking camera T265
+  - quatertion: The rotation of the tracking camera T265
+
+  Output:
+  -------
+  - point: The position of the input point set in global referential
+***/
+struct Vector3 areaMaker::transposeToGlobal(struct Vector3 point, struct Vector3 camPoint, struct Quaternion quaternion)
 {
   struct Vector3 v{0,0,0};
   areaMaker::rotateVectorByQuaternion(point, quaternion, v);
@@ -55,9 +68,54 @@ struct areaMaker::Vector3 areaMaker::transposeToGlobal(struct Vector3 point, str
   return v;
 }
 
+/***
+  Description:
+  ============
+  Main function of the class.
+
+  Input:
+  ------
+  - pointMsg: A list of all detected object. Each element is built
+  that way:
+      * Vector3 position: (x, y, z) position based of camera referential
+
+      * Vector3 scale: 3D box scale (x, y, z) based on the bounding box.
+
+      * string obj_class: The class of the object
+
+      * float32 score: the detection score of the object
+
+  - cameraPosMsg: All the data provided by the Realsense T265 camera.
+  The used data here will be position (x,y,z) in meter and the orientation
+  (w, i, j, k) given in quaternion.
+
+  Output:
+  -------
+  - Objects: A list of object containing specific data.
+      * Vector3 center:
+       -- x: the x position in space (relative to the global position)
+       -- y: the y position in space (relative to the global position)
+       -- z: the z position in space (relative to the global position)
+
+      * Quaternion rotation: The rotation of the object
+
+      * Vector3 scale
+       -- scale_x: the scale in x of the box based on the bounding box
+       -- scale_y: the scale in y of the box based on the bounding box
+       -- scale_z: the scale in z of the box based on the bounding box
+
+      * float64 creation_time: the creation time of the object
+
+      * float64 last_detection_time: the last detection time of the object
+
+      * string obj_class: The class of the object
+
+      * float32 score: the detection score of the object
+
+      * int32 ID: The unique ID of the object
+***/
 void areaMaker::callback(const PointsMsgConstPtr& pointsMsg, const nav_msgs::OdometryConstPtr& cameraPosMsg)
 {
-  cout << "callback" << endl;
   data_processing::ObjectsMsg objects;
 
   for (size_t i = 0; i < pointsMsg->point.size(); i++)
@@ -97,7 +155,54 @@ void areaMaker::callback(const PointsMsgConstPtr& pointsMsg, const nav_msgs::Odo
   }
 }
 
+/***
+  Description:
+  ============
+  Use this to set all data regarding the item in an object ROS message.
+  It set header, position and rotation, class, existence probability
+  score, id and time details on the message.
 
+  Input:
+  ------
+  - item: an object from object_creator class.
+  - id: The id of the object. Not the Sort one to avoid misinformation.
+
+  Output:
+  -------
+  - object: a ROS type message from ObjectMsg.msg. It is used to be
+  appended in ROS type message from ObjectsMsg.msg.
+***/
+data_processing::ObjectMsg areaMaker::sendData(ObjectCreator item, int id)
+{
+  // get all data Publish the position of the object
+  struct Vector3 msg_center = item.getCenter();
+  struct Vector3 msg_scale = item.getScale();
+  struct Quaternion msg_rotation = item.getQuaternion();
+  string msg_class = item.getClass();
+  float msg_score = item.getScore();
+  int msg_ID = id;
+  float msg_creation_time = item.getCreationTime();
+  float msg_last_detection_time = item.getLastDetectionTime();
+  ros::Time now = ros::Time::now();
+  data_processing::ObjectMsg object;
+  object.header.stamp = now;
+  object.center.x = msg_center.x;
+  object.center.y = msg_center.y;
+  object.center.z = msg_center.z;
+  object.scale.x = msg_scale.x;
+  object.scale.y = msg_scale.y;
+  object.scale.z = msg_scale.z;
+  object.rotation.w = msg_rotation.w;
+  object.rotation.x = msg_rotation.x;
+  object.rotation.y = msg_rotation.y;
+  object.rotation.z = msg_rotation.z;
+  object.creation_time = msg_creation_time;
+  object.last_detection_time = msg_last_detection_time;
+  object.obj_class = msg_class;
+  object.score = msg_score;
+  object.ID = msg_ID;
+  return object;
+}
 
 int main(int argc, char** argv){
 

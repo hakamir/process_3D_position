@@ -1,3 +1,6 @@
+#ifndef AREAMAKER
+#define AREAMAKER
+
 #include <ros/ros.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
@@ -13,17 +16,18 @@
 #include <vector>
 #include <stdio.h>
 
+#include "../include/objectCreator.h"
+#include "../include/vectors.h"
+
 class areaMaker
 {
   public:
-
-    struct Vector3 {float x, y, z;};
-    struct Quaternion {float w, x, y, z;};
 
     areaMaker();
     void rotateVectorByQuaternion(const struct Vector3& v, const struct Quaternion& q, struct Vector3& vprime);
     struct Vector3 transposeToGlobal(struct Vector3 point, struct Vector3 camPoint, struct Quaternion quaternion);
     void callback(const yolo_madnet::PointsMsgConstPtr& pointsMsg, const nav_msgs::OdometryConstPtr& cameraPosMsg);
+    data_processing::ObjectMsg sendData(ObjectCreator item, int id);
 
   private:
 
@@ -35,3 +39,5 @@ class areaMaker
     boost::shared_ptr<Sync> sync;
 
 };
+
+#endif

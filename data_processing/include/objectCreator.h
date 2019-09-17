@@ -1,12 +1,14 @@
+#ifndef OBJECTCREATOR
+#define OBJECTCREATOR
+
 #include <string>
 #include <ctime>
 #include <cmath>
+#include "../include/vectors.h"
 
 class ObjectCreator
 {
 public:
-  struct Vector3 {float x, y, z;};
-  struct Quaternion {float w, x, y, z;};
   ObjectCreator(struct Vector3 pointPos, struct Vector3 camPos, struct Vector3 scale, struct Quaternion q, std::string _class, float score, int ID);
   ~ObjectCreator();
   float IoU3D(struct Vector3 scale, struct Vector3 point);
@@ -15,9 +17,9 @@ public:
   void decaying();
 
   // Getters
-  struct areaMaker::Vector3 getCenter();
-  struct areaMaker::Vector3 getScale();
-  struct areaMaker::Quaternion getQuaternion();
+  struct Vector3 getCenter();
+  struct Vector3 getScale();
+  struct Quaternion getQuaternion();
   std::string getClass();
   float getScore();
   int getID();
@@ -30,10 +32,10 @@ public:
   void setLastDetectionTime(float time);
 
 private:
-  struct areaMaker::Vector3 m_center;
-  struct areaMaker::Vector3 m_camPos;
-  struct areaMaker::Vector3 m_scale;
-  struct areaMaker::Quaternion m_quaternion;
+  struct Vector3 m_center;
+  struct Vector3 m_camPos;
+  struct Vector3 m_scale;
+  struct Quaternion m_quaternion;
   std::string m_class;
   float m_score;
   int m_ID;
@@ -41,3 +43,5 @@ private:
   float m_creationTime;
   float m_lastDetection;
 };
+
+#endif
