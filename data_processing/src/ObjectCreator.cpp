@@ -1,4 +1,5 @@
 #include "../include/ObjectCreator.h"
+#include <iostream>
 
 using namespace std;
 
@@ -128,7 +129,7 @@ void ObjectCreator::calibrate(struct Vector3 point, struct Quaternion q, float s
 ***/
 float ObjectCreator::logistic(int iteration, float IoU, float score)
 {
-  return (2.0 / 3.14159265359) * atan((iteration - 1) * IoU * score);
+  return (2.0 / 3.14159265359) * atan((iteration) * IoU * score);
 }
 
 

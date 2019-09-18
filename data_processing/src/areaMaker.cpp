@@ -163,46 +163,43 @@ void areaMaker::callback(const PointsMsgConstPtr& pointsMsg, const nav_msgs::Odo
     // Run through each box created
     for (size_t i = 0; i < m_objList.size(); i++)
     {
-      ObjectCreator item = m_objList.at(i);
-      areaMaker::joinData(item, 0);
-
       // If the class of the item doesn't match with detection, skip
-      if (_class != item.getClass())
+      if (_class != m_objList.at(i).getClass())
       {
         lockObjCreator = false;
         continue;
       }
 
-      else if (ID == item.getID())
+      else if (ID == m_objList.at(i).getID())
       {
-        iou = item.IoU3D(scale, globalPoint);
+        iou = m_objList.at(i).IoU3D(scale, globalPoint);
         // Perform calibration
-        item.calibrate(globalPoint, quaternion, score, scale);
+        m_objList.at(i).calibrate(globalPoint, quaternion, score, scale);
         lockObjCreator = true;
         // Be careful!!!
         // The ID sent is NOT the ID provided by Sort (cause it is
         // unstable). So, we send for rviz the index of the item in
         //the item list because it is unique.
-        objects.object.push_back(joinData(item, i));
+        objects.object.push_back(joinData(m_objList.at(i), i));
         break;
       }
       else
       {
-        iou = item.IoU3D(scale, globalPoint);
+        iou = m_objList.at(i).IoU3D(scale, globalPoint);
         if (iou > 0)
         {
           // Perform calibration
-          item.calibrate(globalPoint, quaternion, score, scale);
+          m_objList.at(i).calibrate(globalPoint, quaternion, score, scale);
           // We change the ID of the object. The previous one might
           // has been lost by Sort for major cases.
-          item.setID(ID);
+          m_objList.at(i).setID(ID);
 
           // PROBLEM WITH ITERATION... Stay at '1', no incrementation.
-          cout << item.getIteration() << endl;
+
 
           // Say that no object must be created
           lockObjCreator = true;
-          objects.object.push_back(joinData(item, i));
+          objects.object.push_back(joinData(m_objList.at(i), i));
           break;
         }
         else
@@ -210,7 +207,7 @@ void areaMaker::callback(const PointsMsgConstPtr& pointsMsg, const nav_msgs::Odo
           lockObjCreator = false;
         }
       }
-      if (time(0) - item.getLastDetectionTime() > 50)
+      if (time(0) - m_objList.at(i).getLastDetectionTime() > 50)
       {
         m_objList.erase(m_objList.begin() + i);
       }
