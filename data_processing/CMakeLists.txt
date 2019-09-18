@@ -40,5 +40,7 @@ include_directories(
 )
 
 add_executable(areaMaker_cpp_node src/areaMaker.cpp)
+add_library(ObjectCreator src/ObjectCreator.cpp)
+target_link_libraries(areaMaker_cpp_node ObjectCreator)
 target_link_libraries(areaMaker_cpp_node ${catkin_LIBRARIES})
 add_dependencies(areaMaker_cpp_node ${catkin_EXPORTED_TARGETS})

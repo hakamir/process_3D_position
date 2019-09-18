@@ -4,11 +4,14 @@
 #include <string>
 #include <ctime>
 #include <cmath>
+#include <algorithm>
 #include "../include/vectors.h"
 
 class ObjectCreator
 {
+
 public:
+
   ObjectCreator(struct Vector3 pointPos, struct Vector3 camPos, struct Vector3 scale, struct Quaternion q, std::string _class, float score, int ID);
   ~ObjectCreator();
   float IoU3D(struct Vector3 scale, struct Vector3 point);
@@ -29,9 +32,10 @@ public:
 
   // Setters
   void setID(int ID);
-  void setLastDetectionTime(float time);
+  void setLastDetectionTime();
 
 private:
+
   struct Vector3 m_center;
   struct Vector3 m_camPos;
   struct Vector3 m_scale;

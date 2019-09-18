@@ -1,4 +1,4 @@
-#include "../include/objectCreator.h"
+#include "../include/ObjectCreator.h"
 
 using namespace std;
 
@@ -11,7 +11,7 @@ ObjectCreator::ObjectCreator(struct Vector3 pointPos, struct Vector3 camPos, str
   m_class = _class;
   m_score = score;
   m_ID = ID;
-  m_iteration = 1;
+  m_iteration = 0;
   m_creationTime = time(0);
   m_lastDetection = m_creationTime;
 }
@@ -44,33 +44,33 @@ float ObjectCreator::IoU3D(struct Vector3 scale, struct Vector3 point)
 {
 
   // Calculate the area of both boxes
-  area = m_scale.x * m_scale.y * m_scale.z
-  new_area = scale.x * scale.y * scale.z
-  ratio = area / new_area
+  float area = m_scale.x * m_scale.y * m_scale.z;
+  float new_area = scale.x * scale.y * scale.z;
+  float ratio = area / new_area;
 
   // Retrieve the initial (x1,x2,y1,y2,z1,z2) positions of the new box
-  x1 = point.x - scale.x/2
-  x2 = point.x + scale.x/2
-  y1 = point.y - scale.y/2
-  y2 = point.y + scale.y/2
-  z1 = point.z - scale.z/2
-  z2 = point.z + scale.z/2
+  float x1 = point.x - scale.x/2;
+  float x2 = point.x + scale.x/2;
+  float y1 = point.y - scale.y/2;
+  float y2 = point.y + scale.y/2;
+  float z1 = point.z - scale.z/2;
+  float z2 = point.z + scale.z/2;
 
   // Retrieve the initial (x1,x2,y1,y2,z1,z2) positions of the actual box
-  x1p = m_center.x - m_scale.x/2
-  x2p = m_center.x + m_scale.x/2
-  y1p = m_center.y - m_scale.y/2
-  y2p = m_center.y + m_scale.y/2
-  z1p = m_center.z - m_scale.z/2
-  z2p = m_center.z + m_scale.z/2
+  float x1p = m_center.x - m_scale.x/2;
+  float x2p = m_center.x + m_scale.x/2;
+  float y1p = m_center.y - m_scale.y/2;
+  float y2p = m_center.y + m_scale.y/2;
+  float z1p = m_center.z - m_scale.z/2;
+  float z2p = m_center.z + m_scale.z/2;
 
   // calculate the area overlap with the previous data
-  overlap = max((min(x2,x2p)-max(x1,x1p)),0)*max((min(y2,y2p)-max(y1,y1p)),0)*max((min(z2,z2p)-max(z1,z1p)),0)
+  float overlap = max((min(x2,x2p)-max(x1,x1p)),0.0f)*max((min(y2,y2p)-max(y1,y1p)),0.0f)*max((min(z2,z2p)-max(z1,z1p)),0.0f);
 
   // calculate the IoU with the previous calculated area
-  IoU = overlap / (area + new_area - overlap)
+  float IoU = overlap / (area + new_area - overlap);
 
-  return IoU
+  return IoU;
 }
 
 /***
@@ -96,8 +96,7 @@ void ObjectCreator::calibrate(struct Vector3 point, struct Quaternion q, float s
     float IoU = ObjectCreator::IoU3D(scale, point);
     m_scale = scale;
     m_center = point;
-    m_iteration += 1;
-
+    m_iteration++;
     // Lock to 1000 to avoid overcomsumption of memory
     if (m_iteration > 1000)
     {
@@ -108,7 +107,6 @@ void ObjectCreator::calibrate(struct Vector3 point, struct Quaternion q, float s
     m_score = ObjectCreator::logistic(m_iteration, IoU, m_score);
     m_lastDetection = time(0);
   }
-)
 
 /***
   Description:
@@ -130,7 +128,7 @@ void ObjectCreator::calibrate(struct Vector3 point, struct Quaternion q, float s
 ***/
 float ObjectCreator::logistic(int iteration, float IoU, float score)
 {
-  return (2.0 / pi) * atan((iteration - 1) * IoU * score);
+  return (2.0 / 3.14159265359) * atan((iteration - 1) * IoU * score);
 }
 
 

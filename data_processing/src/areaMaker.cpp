@@ -15,6 +15,7 @@ areaMaker::areaMaker()
   subCamPos.subscribe(nh, "/t265/odom/sample", 1);
   sync.reset(new Sync(_SyncPolicy(10), subObj, subCamPos));
   sync->registerCallback(boost::bind(&areaMaker::callback, this, _1, _2));
+  pub = nh.advertise<data_processing::ObjectsMsg>("/object/position/3D", 1);
 }
 
 /*
@@ -117,6 +118,8 @@ struct Vector3 areaMaker::transposeToGlobal(struct Vector3 point, struct Vector3
 void areaMaker::callback(const PointsMsgConstPtr& pointsMsg, const nav_msgs::OdometryConstPtr& cameraPosMsg)
 {
   data_processing::ObjectsMsg objects;
+  bool lockObjCreator = true;
+  float iou;
 
   for (size_t i = 0; i < pointsMsg->point.size(); i++)
   {
@@ -132,7 +135,7 @@ void areaMaker::callback(const PointsMsgConstPtr& pointsMsg, const nav_msgs::Odo
     // Get class, score and ID of the object
     string const _class = pt.obj_class;
     double const score = pt.score;
-    int long const id = pt.id;
+    int long const ID = pt.id;
 
     // Get the scale of the object's box
     // Convert scale referential to camera referential
@@ -150,9 +153,76 @@ void areaMaker::callback(const PointsMsgConstPtr& pointsMsg, const nav_msgs::Odo
 
     // Transpose local_point into global referential
     struct Vector3 globalPoint = areaMaker::transposeToGlobal(localPoint, camPoint, quaternion);
-    cout << globalPoint.x << " " << globalPoint.y << " " << globalPoint.z << endl;
 
+    // If no object exists, we create a new mesh at the given position of the added point
+    if (m_objList.size() == 0)
+    {
+      m_objList.push_back(ObjectCreator(globalPoint, camPoint, scale, quaternion, _class, score, ID));
+    }
+
+    // Run through each box created
+    for (size_t i = 0; i < m_objList.size(); i++)
+    {
+      ObjectCreator item = m_objList.at(i);
+      areaMaker::joinData(item, 0);
+
+      // If the class of the item doesn't match with detection, skip
+      if (_class != item.getClass())
+      {
+        lockObjCreator = false;
+        continue;
+      }
+
+      else if (ID == item.getID())
+      {
+        iou = item.IoU3D(scale, globalPoint);
+        // Perform calibration
+        item.calibrate(globalPoint, quaternion, score, scale);
+        lockObjCreator = true;
+        // Be careful!!!
+        // The ID sent is NOT the ID provided by Sort (cause it is
+        // unstable). So, we send for rviz the index of the item in
+        //the item list because it is unique.
+        objects.object.push_back(joinData(item, i));
+        break;
+      }
+      else
+      {
+        iou = item.IoU3D(scale, globalPoint);
+        if (iou > 0)
+        {
+          // Perform calibration
+          item.calibrate(globalPoint, quaternion, score, scale);
+          // We change the ID of the object. The previous one might
+          // has been lost by Sort for major cases.
+          item.setID(ID);
+
+          // PROBLEM WITH ITERATION... Stay at '1', no incrementation.
+          cout << item.getIteration() << endl;
+
+          // Say that no object must be created
+          lockObjCreator = true;
+          objects.object.push_back(joinData(item, i));
+          break;
+        }
+        else
+        {
+          lockObjCreator = false;
+        }
+      }
+      if (time(0) - item.getLastDetectionTime() > 50)
+      {
+        m_objList.erase(m_objList.begin() + i);
+      }
+    }
+    if (!lockObjCreator)
+    {
+      m_objList.push_back(ObjectCreator(globalPoint, camPoint, scale, quaternion, _class, score, ID));
+    }
   }
+  ros::Time now = ros::Time::now();
+  objects.header.stamp = now;
+  pub.publish(objects);
 }
 
 /***
@@ -164,7 +234,7 @@ void areaMaker::callback(const PointsMsgConstPtr& pointsMsg, const nav_msgs::Odo
 
   Input:
   ------
-  - item: an object from object_creator class.
+  - item: an object from ObjectCreator class.
   - id: The id of the object. Not the Sort one to avoid misinformation.
 
   Output:
@@ -172,7 +242,7 @@ void areaMaker::callback(const PointsMsgConstPtr& pointsMsg, const nav_msgs::Odo
   - object: a ROS type message from ObjectMsg.msg. It is used to be
   appended in ROS type message from ObjectsMsg.msg.
 ***/
-data_processing::ObjectMsg areaMaker::sendData(ObjectCreator item, int id)
+data_processing::ObjectMsg areaMaker::joinData(ObjectCreator item, int id)
 {
   // get all data Publish the position of the object
   struct Vector3 msg_center = item.getCenter();
