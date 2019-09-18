@@ -9,6 +9,23 @@ The class is a c++ version of areaMaker.py. It is still under construction and
 might be used to replace the python version for a more efficient one.
 **/
 
+/***
+  Description:
+  ============
+  This script is built to filter the points taken from /object/detected topic. It
+  creates areas that have in attributes a name depending on the class of the
+  detected object, a location, a rotation a scale, a creation time, a deadline,
+  and an existence probability.
+
+  The goal of an existence area is to classify added points to avoid overfeedings
+  of point objects. It means that with recurrence of detection, the program gives
+  the ability to create a coercition from previous added point in a specific
+  area. Also, from the score of the detection and the recurrence, we can set an
+  existence probability that can be used to avoid error of detections.
+***/
+
+int DECAYING_TIME = 50;
+
 areaMaker::areaMaker()
 {
   subObj.subscribe(nh, "/object/detected", 1);
@@ -18,10 +35,18 @@ areaMaker::areaMaker()
   pub = nh.advertise<data_processing::ObjectsMsg>("/object/position/3D", 1);
 }
 
-/*
-This method is used to perform the rotation of the vector v by the Quaternion q
-and the result is a rotated vector vprime.
-*/
+/***
+  Description:
+  ============
+  This method is used to perform the rotation of the vector v by the Quaternion q
+  and the result is a rotated vector vprime.
+
+  Input:
+  ------
+  - v: A Vector3 corresponding to the point we want to rotate (before rotation)
+  - q: a Quaternion that represent the rotation
+  - vprime: The output Vector3 rotated after the rotation
+***/
 void areaMaker::rotateVectorByQuaternion(const struct Vector3& v, const struct Quaternion& q, struct Vector3& vprime)
 {
     float num12 = q.x + q.x;
@@ -42,7 +67,25 @@ void areaMaker::rotateVectorByQuaternion(const struct Vector3& v, const struct Q
     vprime.x = num15;
     vprime.y = num14;
     vprime.z = num13;
+    /*
+    float num = q.x * 2;
+    float num2 = q.y * 2;
+    float num3 = q.z * 2;
+    float num4 = q.x * num;
+    float num5 = q.y * num2;
+    float num6 = q.z * num3;
+    float num7 = q.x * num2;
+    float num8 = q.x * num3;
+    float num9 = q.y * num3;
+    float num10 = q.w * num;
+    float num11 = q.w * num2;
+    float num12 = q.w * num3;
+    vprime.x = (1 - (num5 + num6)) * v.x + (num7 - num12) * v.y + (num8 + num11) * v.z;
+    vprime.y = (num7 + num12) * v.x + (1 - (num4 + num6)) * v.y + (num9 - num10) * v.z;
+    vprime.z = (num8 - num11) * v.x + (num9 + num10) * v.y + (1 - (num4 + num5)) * v.z;
+    */
 }
+
 /***
   Description:
   ============
@@ -143,13 +186,13 @@ void areaMaker::callback(const PointsMsgConstPtr& pointsMsg, const nav_msgs::Odo
 
     // Get the camera position (euler vector) and rotation (quaternion)
     struct Vector3 const camPoint{cameraPosMsg->pose.pose.position.x,
-                            cameraPosMsg->pose.pose.position.y,
-                            cameraPosMsg->pose.pose.position.z};
+                                  cameraPosMsg->pose.pose.position.y,
+                                  cameraPosMsg->pose.pose.position.z};
 
-    struct Quaternion const quaternion{cameraPosMsg->pose.pose.orientation.z,
-                                  cameraPosMsg->pose.pose.orientation.w,
-                                - cameraPosMsg->pose.pose.orientation.x,
-                                  cameraPosMsg->pose.pose.orientation.y};
+    struct Quaternion const quaternion{cameraPosMsg->pose.pose.orientation.y,
+                                       cameraPosMsg->pose.pose.orientation.z,
+                                       cameraPosMsg->pose.pose.orientation.w,
+                                     - cameraPosMsg->pose.pose.orientation.x};
 
     // Transpose local_point into global referential
     struct Vector3 globalPoint = areaMaker::transposeToGlobal(localPoint, camPoint, quaternion);
@@ -207,7 +250,7 @@ void areaMaker::callback(const PointsMsgConstPtr& pointsMsg, const nav_msgs::Odo
           lockObjCreator = false;
         }
       }
-      if (time(0) - m_objList.at(i).getLastDetectionTime() > 50)
+      if (time(0) - m_objList.at(i).getLastDetectionTime() > DECAYING_TIME)
       {
         m_objList.erase(m_objList.begin() + i);
       }
