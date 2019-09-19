@@ -23,13 +23,13 @@ Here's a brief description of each node of the project:
 
 - The *detection* node works with yolov3 through pytorch and provides bounding box positions (x1, y1, x2, y2 format) with class and score related to.
 
-- The *madnet* node works with tensorflow and provide a disparity map used to get the distance of objects.
+- The *madnet* node works with tensorflow and provide a disparity map used to get the distance of objects (meaning for each pixel of our original image, a disparity value can be associated).
 
-- The *post_process* node performs a link between bounding boxes and disparity map and convert it into 3D position point. It corrects to position depending the disparity using a mask process. This node is still in construction and another functions to correct distance estimation and box position will be implemented. (histogram correction, Kalman filter...).
+- The *post_process* node performs a link between bounding boxes and disparity map and convert it into 3D position point. It calculates the distance of the detected object as the median of all disparity values in the bounding box. Next, we use a modified Sort implementation that is used to track (with an associated ID) the object by knowing the position of the 2D boudning box and the assisociated distance. Then, the bounding box is transcripted in 3D through mathematicals equations and is refered to a center with (x,y,z) position and a 3D scale of a cuboid. The node provides class name, detection score, position and scale, and also the ID of each object detected in the frame. 
 
-- The *areaMaker* node create 3D boxes that represent objects with specific IDs. Every objects added to a box with the same class name might reprensent the same object and it correct it position and existence score. Every objects are placed in a global referential by knowing the position of the camera (T265).
+- The *areaMaker* node put 3D objects in global referential by knowing the position of the camera (T265). It creates an instance for each object and make some transformations based on what's happening through time (meaning, correcting the position and the size of the 3D box). Each instance has a specific ID inspired by the one giving by Sort. It also manages to found the object back with 3D IoU when Sort lose the track. An existence score is calculated to evaluate the veracity of the detection of the object. 
 
-- The *visualizer* node is only used to visualize the position of the 3D boxes with rviz.
+- The *visualizer* node is only used to visualize the position of the 3D boxes with rviz and a mesh representing the wheelchair.
 
 ## Usage:
 
@@ -51,11 +51,11 @@ Both can be run with:
 It is also possible to run each node one by one with this following commands:
 
 - Use Realsense package for D435 and T265 cameras: `roslaunch realsense2_camera rs_d400_and_t_265.launch`
-- Detection : `python yolo_madnet/scripts/detection.py`
-- Distance estimation (MADNet) : `python yolo_madnet/scripts/madnet.py`
-- Post-processing : `python yolo_madnet/scripts/post_process.py`
-- Create area for objects : `python data_processing/scripts/areaMaker.py`
-- Publish area to be visualize in rviz : `python data_processing/scripts/visualizer.py`
+- Detection : `python detection.py`
+- Distance estimation (MADNet) : `python madnet.py`
+- Post-processing : `python post_process.py`
+- Create area for objects : `python areaMaker.py`
+- Publish area to be visualized in rviz : `python visualizer.py`
 
 ## Requirements:
 
