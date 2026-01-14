@@ -5,7 +5,7 @@
 
 ## Introduction
 
-For the ADAPT project (http://adapt-project.com/), the ESIGELEC/IRSEEM is working on the detection of various objects to autonomous mobility of a wheel chair. The aim is to give the ability to see the position of every elements detected by cameras thanks to active vision and Deep Learning algorithms to move to needed objects.
+For the ADAPT project, the ESIGELEC/IRSEEM is working on the detection of various objects to autonomous mobility of a wheel chair. The aim is to give the ability to see the position of every elements detected by cameras thanks to active vision and Deep Learning algorithms to move to needed objects.
 
 A usecase is to detect a door (then its handle) to approach the patient to help him to open it.
 
