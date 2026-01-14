@@ -1,4 +1,4 @@
-## *Work in progress*
+## *DEPRECATED*
 
 
 # Process 3D position
@@ -85,9 +85,7 @@ Pytorch works on 1.1.0 version with Python 2.7.
 
 ## Downloads:
 
-The following link contains the RTSADS (Real-Time Self-Adaptative Deep-Stereo) and yolov3 repositories of this projet. Just copy them at the right place to get the functions needed for algorithms (path : *process_3D_position/yolo_madnet/scripts*).
-
-https://drive.google.com/open?id=14Qo4OG7SG-3dx6KpVBU8zf-G2KVHL4lZ
+The following link containing the RTSADS (Real-Time Self-Adaptative Deep-Stereo) and yolov3 repositories of this projet has been deleted. Algorithms can't works anymore.
 
 ## Ressources:
 
